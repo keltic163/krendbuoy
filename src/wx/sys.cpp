@@ -105,6 +105,7 @@ void systemDrawScreen()
     mf->UpdateViewers();
     // FIXME: Sm60FPS crap and sondBufferLow crap
     GameArea* ga = mf->GetPanel();
+
 #ifndef NO_FFMPEG
 
     if (ga)
@@ -112,8 +113,9 @@ void systemDrawScreen()
 
 #endif
 
-    if (ga && ga->panel)
+    if (ga && ga->panel) {
         ga->panel->DrawArea(&g_pix);
+    }
 }
 
 // record a game "movie"
