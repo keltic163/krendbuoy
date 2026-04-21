@@ -530,7 +530,7 @@ DisplayConfig::DisplayConfig(wxWindow* parent)
     plugin_selector_->Bind(wxEVT_CHOICE, &DisplayConfig::OnPluginSelected, this);
 
     // Set initial plugin directory from config
-    const wxString& config_plugin_dir = OPTION(kDispPluginDir);
+    const wxString config_plugin_dir = OPTION(kDispPluginDir);
     if (!config_plugin_dir.empty()) {
         plugin_dir_picker_->SetPath(config_plugin_dir);
     } else {

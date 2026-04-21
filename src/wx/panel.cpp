@@ -2153,7 +2153,7 @@ DrawingPanelBase::DrawingPanelBase(int _width, int _height)
     memset(&rpi_info_, 0, sizeof(rpi_info_));
 
     if (OPTION(kDispFilter) == config::Filter::kPlugin) {
-        const wxString& pluginPath = OPTION(kDispFilterPlugin);
+        const wxString pluginPath = OPTION(kDispFilterPlugin);
         bool loaded = false;
 
 #ifdef VBAM_RPI_PROXY_SUPPORT

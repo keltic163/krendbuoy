@@ -134,7 +134,7 @@ static bool LoadPluginInstance(const wchar_t* path, HMODULE* outHandle, RENDER_P
     }
 
     RENDPLUG_GetInfo getInfo = reinterpret_cast<RENDPLUG_GetInfo>(
-        GetProcAddress(*outHandle, "RenderPluginGetInfo"));
+        reinterpret_cast<void*>(GetProcAddress(*outHandle, "RenderPluginGetInfo")));
 
     if (!getInfo) {
         FreeLibrary(*outHandle);
@@ -175,7 +175,7 @@ static bool LoadPluginInstance(const wchar_t* path, HMODULE* outHandle, RENDER_P
     // Get Output function if not set
     if (!(*outInfo)->Output) {
         (*outInfo)->Output = reinterpret_cast<RENDPLUG_Output>(
-            GetProcAddress(*outHandle, "RenderPluginOutput"));
+            reinterpret_cast<void*>(GetProcAddress(*outHandle, "RenderPluginOutput")));
     }
 
     if (!(*outInfo)->Output) {
