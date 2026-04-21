@@ -1755,6 +1755,13 @@ void GameArea::OnIdle(wxIdleEvent& event)
     wxString pl = wxGetApp().pending_load;
     MainFrame* mf = wxGetApp().frame;
 
+    // Preload one config dialog per idle tick while no ROM is running, so
+    // the user doesn't pay the XRC parse cost the first time they open
+    // Options. Skipped once emulation is active.
+    if (!emusys && mf && mf->PreloadOneDialog()) {
+        event.RequestMore();
+    }
+
     if (pl.size()) {
         // sometimes this gets into a loop if LoadGame() called before
         // clearing pending_load.  weird.

@@ -219,6 +219,13 @@ public:
     // Lazy dialog loading - each dialog loaded on first access
     wxDialog* LoadDialog(const wxString& name);  // Load and initialize a dialog by name
     std::set<wxString> dialogs_initialized_;
+
+    // Pulls one dialog off the preload queue and loads it. Called from
+    // GameArea::OnIdle while no ROM is running so we amortize the XRC parse
+    // cost before the user opens Options. Returns true if more work remains.
+    bool PreloadOneDialog();
+    std::vector<wxString> dialogs_preload_queue_;
+    bool dialogs_preload_populated_ = false;
     void MenuOptionIntMask(const wxString& menuName, int field, int mask);
     void MenuOptionIntRadioValue(const wxString& menuName, int field, int mask);
     void MenuOptionBool(const wxString& menuName, bool field);

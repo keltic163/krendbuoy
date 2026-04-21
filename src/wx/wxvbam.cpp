@@ -1217,6 +1217,42 @@ EVT_MENU_HIGHLIGHT_ALL(MainFrame::MenuPopped)
 
 END_EVENT_TABLE()
 
+bool MainFrame::PreloadOneDialog() {
+    // Populate the queue on first call. LoadDialog() is a no-op for dialogs
+    // already in dialogs_initialized_, so we just list every entry point;
+    // sub-dialogs (LinkConfig, CheatEdit, CheatAdd) are brought in by their
+    // parents' LoadDialog() implementations.
+    if (!dialogs_preload_populated_) {
+        dialogs_preload_populated_ = true;
+        dialogs_preload_queue_ = {
+            wxT("GeneralConfig"),       wxT("GameBoyConfig"),
+            wxT("GameBoyAdvanceConfig"), wxT("DisplayConfig"),
+            wxT("SoundConfig"),         wxT("DirectoriesConfig"),
+            wxT("JoypadConfig"),        wxT("SpeedupConfig"),
+            wxT("AccelConfig"),         wxT("CheatList"),
+            wxT("CheatCreate"),         wxT("NetLink"),
+            wxT("CodeSelect"),          wxT("ExportSPS"),
+            wxT("GBPrinter"),           wxT("GBAROMInfo"),
+            wxT("GBROMInfo"),
+        };
+    }
+
+    // Skip over any dialog that's already been loaded on demand.
+    while (!dialogs_preload_queue_.empty() &&
+           dialogs_initialized_.count(dialogs_preload_queue_.back())) {
+        dialogs_preload_queue_.pop_back();
+    }
+
+    if (dialogs_preload_queue_.empty()) {
+        return false;
+    }
+
+    const wxString name = dialogs_preload_queue_.back();
+    dialogs_preload_queue_.pop_back();
+    LoadDialog(name);
+    return !dialogs_preload_queue_.empty();
+}
+
 void MainFrame::OnActivate(wxActivateEvent& event) {
     const bool focused = event.GetActive();
 
