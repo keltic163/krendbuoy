@@ -1078,6 +1078,7 @@ add_custom_target(
     vbam-wx-pot
     COMMAND ${XGETTEXT}
         -k_ -kN_ 
+        --from-code=UTF-8
         -o ${CMAKE_BINARY_DIR}/wxvbam.pot
         ${VBAM_LOCALIZABLE_FILES} ${CMAKE_BINARY_DIR}/wx-xrc-strings.h
     BYPRODUCTS
