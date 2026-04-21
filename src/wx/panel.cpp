@@ -3005,7 +3005,35 @@ private:
             outdesc.OutW = outdesc.DstW;
             outdesc.OutH = outdesc.DstH;
 
-            std::vector<uint8_t> src_padded(static_cast<size_t>(paddedSrcPitch) * paddedHeight);
+            // Zero-copy path for the proxy: write format-converted source
+            // straight into the shared-memory src buffer and have the plugin
+            // write output straight into the shared-memory dst buffer. Reading
+            // back then folds the format conversion with the shared-mem read,
+            // avoiding two full-frame memcpys per call.
+            const size_t srcBytes = static_cast<size_t>(paddedSrcPitch) * paddedHeight;
+            const size_t dstBytes = static_cast<size_t>(outstride) * scaled_height;
+            uint8_t* src_buffer = nullptr;
+            uint8_t* dst_buffer = dst_;
+            std::vector<uint8_t> src_fallback;
+#ifdef VBAM_RPI_PROXY_SUPPORT
+            if (rpi_proxy_client_ &&
+                srcBytes <= rpi_proxy::RpiProxyClient::kMaxBufferBytes &&
+                dstBytes <= rpi_proxy::RpiProxyClient::kMaxBufferBytes) {
+                src_buffer = static_cast<uint8_t*>(
+                    rpi_proxy_client_->GetSrcBuffer(static_cast<uint32_t>(threadno_)));
+                uint8_t* shared_dst = static_cast<uint8_t*>(
+                    rpi_proxy_client_->GetDstBuffer(static_cast<uint32_t>(threadno_)));
+                if (src_buffer && shared_dst) {
+                    dst_buffer = shared_dst;
+                } else {
+                    src_buffer = nullptr;  // Proxy not ready — fall back to staging.
+                }
+            }
+#endif
+            if (!src_buffer) {
+                src_fallback.resize(srcBytes);
+                src_buffer = src_fallback.data();
+            }
 
             auto convert_pixel_888 = [](uint32_t p) -> uint32_t {
                 return 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
@@ -3021,7 +3049,7 @@ private:
                 for (int y = 0; y < height_; y++) {
                     const uint32_t* s = reinterpret_cast<const uint32_t*>(src_ + y * instride);
                     uint32_t* d = reinterpret_cast<uint32_t*>(
-                        src_padded.data() + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
+                        src_buffer + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
                     for (int x = 0; x < width_; x++) d[x] = convert_pixel_888(s[x]);
                     // Replicate edge pixels into horizontal padding.
                     for (int k = 1; k <= kPluginCtx; k++) { d[-k] = d[0]; d[width_ - 1 + k] = d[width_ - 1]; }
@@ -3031,7 +3059,7 @@ private:
                 for (int y = 0; y < height_; y++) {
                     const uint16_t* s = reinterpret_cast<const uint16_t*>(src_ + y * instride);
                     uint16_t* d = reinterpret_cast<uint16_t*>(
-                        src_padded.data() + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
+                        src_buffer + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
                     for (int x = 0; x < width_; x++) d[x] = convert_pixel_565(s[x]);
                     for (int k = 1; k <= kPluginCtx; k++) { d[-k] = d[0]; d[width_ - 1 + k] = d[width_ - 1]; }
                 }
@@ -3039,7 +3067,7 @@ private:
                 for (int y = 0; y < height_; y++) {
                     const uint16_t* s = reinterpret_cast<const uint16_t*>(src_ + y * instride);
                     uint16_t* d = reinterpret_cast<uint16_t*>(
-                        src_padded.data() + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
+                        src_buffer + (y + kPluginCtx) * paddedSrcPitch) + kPluginCtx;
                     memcpy(d, s, width_ * 2);
                     for (int k = 1; k <= kPluginCtx; k++) { d[-k] = d[0]; d[width_ - 1 + k] = d[width_ - 1]; }
                 }
@@ -3047,24 +3075,22 @@ private:
 
             // Replicate the first/last real rows into the vertical padding rows.
             for (int k = 1; k <= kPluginCtx; k++) {
-                memcpy(src_padded.data() + (kPluginCtx - k) * paddedSrcPitch,
-                       src_padded.data() + kPluginCtx * paddedSrcPitch,
+                memcpy(src_buffer + (kPluginCtx - k) * paddedSrcPitch,
+                       src_buffer + kPluginCtx * paddedSrcPitch,
                        paddedSrcPitch);
-                memcpy(src_padded.data() + (kPluginCtx + height_ - 1 + k) * paddedSrcPitch,
-                       src_padded.data() + (kPluginCtx + height_ - 1) * paddedSrcPitch,
+                memcpy(src_buffer + (kPluginCtx + height_ - 1 + k) * paddedSrcPitch,
+                       src_buffer + (kPluginCtx + height_ - 1) * paddedSrcPitch,
                        paddedSrcPitch);
             }
 
-            outdesc.SrcPtr = src_padded.data() + kPluginCtx * paddedSrcPitch + kPluginCtx * bpp;
+            outdesc.SrcPtr = src_buffer + kPluginCtx * paddedSrcPitch + kPluginCtx * bpp;
+            outdesc.DstPtr = dst_buffer;
 
-            // Plugin writes directly into the panel buffer with its native outstride.
-            // Only the leading scaled_width pixels of each row are data; the trailing
-            // bytes are border padding the plugin leaves untouched.
-            outdesc.DstPtr = dst_;
-
+            bool plugin_ok = true;
 #ifdef VBAM_RPI_PROXY_SUPPORT
             if (rpi_proxy_client_) {
-                rpi_proxy_client_->ApplyFilter(&outdesc, static_cast<uint32_t>(threadno_), 0);
+                plugin_ok = rpi_proxy_client_->ApplyFilter(
+                    &outdesc, static_cast<uint32_t>(threadno_), 0);
             } else
 #endif
             {
@@ -3072,27 +3098,46 @@ private:
                 rpi_->Output(&outdesc);
             }
 
-            // Convert plugin output back to VBA-M's native format, in place on dst_.
-            // Only touch the data portion of each row (first scaled_width pixels) —
-            // the row's trailing border bytes were not written by the plugin.
+            if (!plugin_ok) {
+                // Plugin call failed — dst_ and the shared dst buffer are in an
+                // undefined state. Leaving dst_ unchanged keeps the last good
+                // frame on screen rather than rendering garbage.
+                return;
+            }
+
+            // Convert plugin output to VBA-M's native format, reading from
+            // dst_buffer (shared or panel) and writing to dst_ (panel). When
+            // dst_buffer == dst_ (no zero-copy), the loop effectively works
+            // in place; when dst_buffer is the shared buffer this loop also
+            // folds in the copy-back step, so no extra pass is needed.
             if (bpp == 4) {
                 for (int y = 0; y < scaled_height; y++) {
+                    const uint32_t* s = reinterpret_cast<const uint32_t*>(dst_buffer + y * outstride);
                     uint32_t* d = reinterpret_cast<uint32_t*>(dst_ + y * outstride);
                     for (int x = 0; x < scaled_width; x++) {
-                        uint32_t p = d[x];
+                        uint32_t p = s[x];
                         d[x] = (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
                     }
                 }
             } else if (rpi_using_rgb565_) {
                 for (int y = 0; y < scaled_height; y++) {
+                    const uint16_t* s = reinterpret_cast<const uint16_t*>(dst_buffer + y * outstride);
                     uint16_t* d = reinterpret_cast<uint16_t*>(dst_ + y * outstride);
                     for (int x = 0; x < scaled_width; x++) {
-                        uint16_t p = d[x];
+                        uint16_t p = s[x];
                         uint8_t r = (p >> 11) & 0x1f;
                         uint8_t g6 = (p >> 5) & 0x3f;
                         uint8_t b = p & 0x1f;
                         d[x] = (r << 10) | ((g6 >> 1) << 5) | b;
                     }
+                }
+            } else if (dst_buffer != dst_) {
+                // 555 plugin on the zero-copy path: no format conversion, but
+                // we still need to move the scaled image out of shared memory
+                // into the panel buffer.
+                const int data_bytes = scaled_width * bpp;
+                for (int y = 0; y < scaled_height; y++) {
+                    memcpy(dst_ + y * outstride, dst_buffer + y * outstride, data_bytes);
                 }
             }
         } else {

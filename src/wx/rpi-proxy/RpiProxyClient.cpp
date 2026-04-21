@@ -819,20 +819,20 @@ void RpiProxyClient::StopThread(uint32_t thread_id) {
     CleanupThreadIPC(thread_id);
 }
 
-void RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thread_id, uint32_t actualDstPitch) {
+bool RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thread_id, uint32_t actualDstPitch) {
     if (!is_loaded_ || !host_process_) {
-        return;
+        return false;
     }
 
     if (thread_id >= kMaxFilterThreads) {
-        return;
+        return false;
     }
 
     ThreadIPC& ipc = thread_ipc_[thread_id];
 
     // Acquire the lock to prevent CleanupThreadIPC from unmapping memory while we use it
     if (!ipc.cs_initialized) {
-        return;
+        return false;
     }
     EnterCriticalSection(&ipc.cs);
 
@@ -840,13 +840,13 @@ void RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thre
     if (!ipc.active) {
         // Thread channel not active - this happens during enumeration when threads are stopped.
         LeaveCriticalSection(&ipc.cs);
-        return;
+        return false;
     }
 
     SharedFilterBuffer* mem = ipc.shared_mem;
     if (!mem) {
         LeaveCriticalSection(&ipc.cs);
-        return;
+        return false;
     }
 
     // Copy parameters to the appropriate shared memory
@@ -861,13 +861,15 @@ void RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thre
     mem->filterParams.outW = params->OutW;
     mem->filterParams.outH = params->OutH;
 
-    // Copy source pixel data to shared memory
+    // Copy source pixel data to shared memory — unless the caller already
+    // wrote straight into the shared src buffer (zero-copy fast path).
     size_t srcSize = static_cast<size_t>(params->SrcPitch) * params->SrcH;
-    if (srcSize <= kMaxPixelBufferSize && params->SrcPtr) {
-        memcpy(mem->GetSrcBuffer(), params->SrcPtr, srcSize);
-    } else {
+    if (!params->SrcPtr || srcSize > kMaxPixelBufferSize) {
         LeaveCriticalSection(&ipc.cs);
-        return;
+        return false;
+    }
+    if (params->SrcPtr != mem->GetSrcBuffer()) {
+        memcpy(mem->GetSrcBuffer(), params->SrcPtr, srcSize);
     }
 
     // Execute filter using thread channel
@@ -876,26 +878,33 @@ void RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thre
     if (!success) {
         // Filter failed, destination buffer unchanged
         LeaveCriticalSection(&ipc.cs);
-        return;
+        return false;
     }
 
     // Memory barrier to ensure we see the host's writes to shared memory
     MemoryBarrier();
 
-    // Copy result back from shared memory
+    if (!params->DstPtr) {
+        LeaveCriticalSection(&ipc.cs);
+        return false;
+    }
+
+    const uint8_t* srcData = static_cast<const uint8_t*>(mem->GetDstBuffer());
+    uint8_t* dstData = static_cast<uint8_t*>(params->DstPtr);
+
+    // Zero-copy fast path: caller is reading straight from the shared dst
+    // buffer, so the copy-back would be a no-op or wrong (same pointer).
+    if (dstData == srcData) {
+        LeaveCriticalSection(&ipc.cs);
+        return true;
+    }
+
+    // Copy result back from shared memory.
     // If actualDstPitch differs from DstPitch, we need row-by-row copying
     // because the plugin wrote with DstPitch but the destination buffer has actualDstPitch
     const uint32_t pluginPitch = params->DstPitch;
     const uint32_t bufferPitch = (actualDstPitch > 0) ? actualDstPitch : pluginPitch;
     const uint32_t dstHeight = params->DstH;
-
-    if (!params->DstPtr) {
-        LeaveCriticalSection(&ipc.cs);
-        return;
-    }
-
-    const uint8_t* srcData = static_cast<const uint8_t*>(mem->GetDstBuffer());
-    uint8_t* dstData = static_cast<uint8_t*>(params->DstPtr);
 
     if (pluginPitch == bufferPitch) {
         // Simple case: strides match, single memcpy
@@ -914,6 +923,19 @@ void RpiProxyClient::ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thre
     }
 
     LeaveCriticalSection(&ipc.cs);
+    return true;
+}
+
+void* RpiProxyClient::GetSrcBuffer(uint32_t thread_id) {
+    if (thread_id >= kMaxFilterThreads) return nullptr;
+    ThreadIPC& ipc = thread_ipc_[thread_id];
+    return ipc.shared_mem ? ipc.shared_mem->GetSrcBuffer() : nullptr;
+}
+
+void* RpiProxyClient::GetDstBuffer(uint32_t thread_id) {
+    if (thread_id >= kMaxFilterThreads) return nullptr;
+    ThreadIPC& ipc = thread_ipc_[thread_id];
+    return ipc.shared_mem ? ipc.shared_mem->GetDstBuffer() : nullptr;
 }
 
 std::vector<RpiProxyClient::PluginEnumResult> RpiProxyClient::EnumeratePlugins(

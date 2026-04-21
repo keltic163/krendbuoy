@@ -38,7 +38,22 @@ public:
     // thread_id: thread slot for multi-threaded filtering (0-7)
     // actualDstPitch: actual row stride of destination buffer (for stride conversion)
     //                 If 0, uses params->DstPitch (no conversion needed)
-    void ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thread_id = 0, uint32_t actualDstPitch = 0);
+    //
+    // Zero-copy fast path: if SrcPtr points to the buffer returned by
+    // GetSrcBuffer(thread_id) the client-side src→shared copy is skipped;
+    // likewise DstPtr = GetDstBuffer(thread_id) skips the dst→client copy-back.
+    // Returns true on success (plugin ran to completion). On failure the
+    // destination buffer contents are undefined.
+    bool ApplyFilter(const RENDER_PLUGIN_OUTP* params, uint32_t thread_id = 0, uint32_t actualDstPitch = 0);
+
+    // Direct pointers into a thread's shared-memory src/dst buffers. Writing
+    // format-converted source straight into GetSrcBuffer() before ApplyFilter
+    // — and reading output straight from GetDstBuffer() afterward — avoids
+    // the in-proxy memcpys. Each buffer is kMaxBufferBytes large. Returns
+    // nullptr if the thread's IPC channel isn't initialized.
+    void* GetSrcBuffer(uint32_t thread_id);
+    void* GetDstBuffer(uint32_t thread_id);
+    static constexpr uint32_t kMaxBufferBytes = kMaxPixelBufferSize;
 
     // Start a filter thread in the host process.
     // This loads the plugin in a dedicated host thread for thread-safe filtering.
