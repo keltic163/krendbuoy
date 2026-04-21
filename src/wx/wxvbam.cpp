@@ -415,7 +415,7 @@ wxvbamApp::wxvbamApp()
 
 const wxString wxvbamApp::GetPluginsDir()
 {
-    const wxString& config_dir = OPTION(kDispPluginDir);
+    const wxString config_dir = OPTION(kDispPluginDir);
     if (!config_dir.empty()) {
         return config_dir;
     }
