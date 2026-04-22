@@ -329,7 +329,7 @@ msgstr "Filtro: %s"
 #: cmdevents.cpp:2339 cmdevents.cpp:2356
 #, c-format
 msgid "Filter: Plugin (%s)"
-msgstr ""
+msgstr "Filtro: Plugin (%s)"
 
 #: cmdevents.cpp:2376
 #, c-format
@@ -916,7 +916,7 @@ msgstr "O Metal não está disponível, revertendo pro padrão OpenGL"
 
 #: panel.cpp:1897
 msgid "Vulkan is unavailable, defaulting to OpenGL"
-msgstr ""
+msgstr "O Vulkan está indisponível, usando por padrão OpenGL"
 
 #: panel.cpp:2036
 msgid "No memory for rewinding"
@@ -1284,7 +1284,7 @@ msgstr "Dispositivo Vulkan criado com sucesso"
 msgid ""
 "Neither VK_KHR_wayland_surface nor VK_KHR_xlib_surface is available — cannot"
 " create Vulkan surface on this system"
-msgstr ""
+msgstr "Nem VK_KHR_wayland_surface e nem o VK_KHR_xlib_surface estão disponíveis — não pôde criar uma superfície do Vulkan neste sistema"
 
 #: panel.cpp:6871
 #, c-format
@@ -1302,30 +1302,30 @@ msgstr "Falhou em criar o dispositivo Win32 do Vulkan: %d"
 
 #: panel.cpp:6912
 msgid "Failed to obtain NSView handle for Vulkan surface"
-msgstr ""
+msgstr "Falhou em obter a alavanca do NSView pra superfície do Vulkan"
 
 #: panel.cpp:6923
 #, c-format
 msgid "Failed to create Vulkan Metal surface: %d"
-msgstr ""
+msgstr "Falhou em criar a superfície do Vulkan pro Metal: %d"
 
 #: panel.cpp:6941
 #, c-format
 msgid "Failed to create Vulkan Xlib surface: %d"
-msgstr ""
+msgstr "Falhou em criar a superfície do Vulkan pro Xlib: %d"
 
 #: panel.cpp:6960
 #, c-format
 msgid "Failed to create Vulkan Wayland surface: %d"
-msgstr ""
+msgstr "Falhou em criar a superfície do Vulkan pro Wayland: %d"
 
 #: panel.cpp:6999
 msgid "Failed to obtain Wayland display/surface handles"
-msgstr ""
+msgstr "Falhou em obter as alavancas de exibição/superfície do Wayland"
 
 #: panel.cpp:7013
 msgid "No supported Vulkan surface extension available"
-msgstr ""
+msgstr "Nenhuma extensão de superfície do Vulkan suportada disponível"
 
 #: panel.cpp:7024
 msgid "No Vulkan physical devices found"
@@ -1779,7 +1779,7 @@ msgstr "Biblioteca dos plugins dos filtros"
 
 #: /home/rkitover/source/repos/vbam-tx-pulls/src/wx/config/internal/option-internal.cpp:441
 msgid "Directory containing RPI filter plugins"
-msgstr ""
+msgstr "Diretório contendo plugins de filtro RPI"
 
 #: /home/rkitover/source/repos/vbam-tx-pulls/src/wx/config/internal/option-internal.cpp:442
 msgid "Interframe blending function"
@@ -2556,25 +2556,25 @@ msgstr "FAudio: Falhou em criar a voz de origem!"
 #: audio/internal/xaudio2.cpp:168
 #, c-format
 msgid "XAudio2: Too many audio instances (max %d)"
-msgstr ""
+msgstr "XAudio2: Muitas instâncias de áudio (máximo %d)"
 
 #: audio/internal/xaudio2.cpp:291
 #, c-format
 msgid "XAudio2: XAudio2_7 Initialize failed with HRESULT: 0x%08X"
-msgstr ""
+msgstr "XAudio2: XAudio2_7 a inicialização falhou com HRESULT: 0x%08X"
 
 #: audio/internal/xaudio2.cpp:296
 msgid "XAudio2: Failed to create XAudio2 2.7"
-msgstr ""
+msgstr "XAudio2: Falhou em criar o XAudio2 2.7"
 
 #: audio/internal/xaudio2.cpp:303
 msgid ""
 "XAudio2: Could not load XAudio2_9.dll, XAudio2_8.dll, or XAudio2_7.dll!"
-msgstr ""
+msgstr "XAudio2: Não pôde carregar o XAudio2_9.dll, XAudio2_8.dll ou XAudio2_7.dll!"
 
 #: audio/internal/xaudio2.cpp:322
 msgid "XAudio2: Failed to enumerate devices for XAudio2 2.7"
-msgstr ""
+msgstr "XAudio2: Falhou em enumerar os dispositivos pro XAudio2 2.7"
 
 #: audio/internal/xaudio2_7.cpp:112 audio/internal/xaudio2_7.cpp:525
 msgid "XAudio2: Enumerating devices failed!"
@@ -2582,84 +2582,84 @@ msgstr "XAudio2: Falhou em enumerar os dispositivos!"
 
 #: audio/internal/xaudio2_7.cpp:128
 msgid "XAudio2: Device not found, using default"
-msgstr ""
+msgstr "XAudio2: Dispositivo não encontrado, usando o padrão"
 
 #: audio/internal/xaudio2_7.cpp:141
 msgid "XAudio2: Could not get device details for upmix"
-msgstr ""
+msgstr "XAudio2: Não pôde obter detalhes do dispositivo pro upmix"
 
 #: audio/internal/xaudio2_7.cpp:155 audio/internal/xaudio2_9.cpp:131
 msgid "XAudio2: Failed to allocate upmix matrix"
-msgstr ""
+msgstr "XAudio2: Falhou em alocar a matriz do upmix"
 
 #: audio/internal/xaudio2_7.cpp:216 audio/internal/xaudio2_9.cpp:192
 #, c-format
 msgid "XAudio2: Unsupported channel count for upmix: %d"
-msgstr ""
+msgstr "XAudio2: Contagem de canais não suportada pro upmix: %d"
 
 #: audio/internal/xaudio2_7.cpp:223 audio/internal/xaudio2_9.cpp:199
 msgid "XAudio2: Failed to set output matrix for upmix"
-msgstr ""
+msgstr "XAudio2: Falhou em definir a matriz de saída pro upmix"
 
 #: audio/internal/xaudio2_7.cpp:236
 msgid "XAudio2: Null XAudio2 instance passed to driver!"
-msgstr ""
+msgstr "XAudio2: Instância nula XAudio2 passada pro driver!"
 
 #: audio/internal/xaudio2_7.cpp:305 audio/internal/xaudio2_9.cpp:267
 msgid "XAudio2 instance not available!"
-msgstr ""
+msgstr "Instância do XAudio2 não disponível!"
 
 #: audio/internal/xaudio2_7.cpp:314
 msgid "XAudio2 instance appears to be invalid"
-msgstr ""
+msgstr "A instância do XAudio2 aparenta ser inválida"
 
 #: audio/internal/xaudio2_7.cpp:323 audio/internal/xaudio2_9.cpp:276
 msgid "XAudio2: Failed to allocate audio buffers!"
-msgstr ""
+msgstr "XAudio2: Falhou em alocar os buffers de áudio!"
 
 #: audio/internal/xaudio2_7.cpp:346 audio/internal/xaudio2_9.cpp:301
 #, c-format
 msgid "XAudio2: Creating mastering voice failed! HRESULT: 0x%08X"
-msgstr ""
+msgstr "XAudio2: Falhou em criar a voz de masterização! HRESULT: 0x%08X"
 
 #: audio/internal/xaudio2_7.cpp:355 audio/internal/xaudio2_9.cpp:310
 #, c-format
 msgid "XAudio2: Creating source voice failed! HRESULT: 0x%08X"
-msgstr ""
+msgstr "XAudio2: Falhou em criar a voz de origem! HRESULT: 0x%08X"
 
 #: audio/internal/xaudio2_7.cpp:369 audio/internal/xaudio2_9.cpp:324
 #, c-format
 msgid "XAudio2: Starting source voice failed! HRESULT: 0x%08X"
-msgstr ""
+msgstr "XAudio2: Falhou em iniciar a voz de origem! HRESULT: 0x%08X"
 
 #: audio/internal/xaudio2_7.cpp:397 audio/internal/xaudio2_9.cpp:350
 msgid "XAudio2: Failed to reinitialize audio after device change"
-msgstr ""
+msgstr "XAudio2: Falhou em reinicializar o áudio após a mudança de dispositivo"
 
 #: audio/internal/xaudio2_7.cpp:410 audio/internal/xaudio2_9.cpp:363
 msgid "XAudio2: Too many buffers queued, resetting"
-msgstr ""
+msgstr "XAudio2: Buffers demais na fila, resetando"
 
 #: audio/internal/xaudio2_7.cpp:448 audio/internal/xaudio2_9.cpp:400
 #, c-format
 msgid "XAudio2: SubmitSourceBuffer failed! HRESULT: 0x%08X"
-msgstr ""
+msgstr "XAudio2: O SubmitSourceBuffer falhou! HRESULT: 0x%08X"
 
 #: audio/internal/xaudio2_7.cpp:471 audio/internal/xaudio2_9.cpp:423
 msgid "XAudio2: Failed to resume playback!"
-msgstr ""
+msgstr "XAudio2: Falhou em resumir a reprodução!"
 
 #: audio/internal/xaudio2_7.cpp:499
 msgid "XAudio2: Cannot create driver with null XAudio2 instance"
-msgstr ""
+msgstr "XAudio2: Não pôde criar o driver com instância nula do XAudio2"
 
 #: audio/internal/xaudio2_7.cpp:507
 msgid "XAudio2: XAudio2 instance appears to be invalid"
-msgstr ""
+msgstr "XAudio2: A instância do XAudio2 aparenta ser inválida"
 
 #: audio/internal/xaudio2_7.cpp:540
 msgid "XAudio2: Exception during device enumeration"
-msgstr ""
+msgstr "XAudio2: Exceção durante a enumeração dos dispositivos"
 
 #: /home/rkitover/source/repos/vbam-tx-pulls/src/core/gba/gbaLink.cpp:681
 msgid "Error, link already connected"
@@ -3042,11 +3042,11 @@ msgstr "Filtros"
 
 #: xrc/DisplayConfig.xrc:122
 msgid "Plugin filter dir:"
-msgstr ""
+msgstr "Diretório dos plugins dos filtros:"
 
 #: xrc/DisplayConfig.xrc:128
 msgid "Select plugin directory"
-msgstr ""
+msgstr "Selecionar diretório dos plugins"
 
 #: xrc/DisplayConfig.xrc:135
 msgid "Display filter:"
@@ -3086,7 +3086,7 @@ msgstr "Simple 4x"
 
 #: xrc/DisplayConfig.xrc:165
 msgid "Filter plugin:"
-msgstr ""
+msgstr "Plugin do filtro:"
 
 #: xrc/DisplayConfig.xrc:175
 msgid "Interframe blending:"
@@ -3757,7 +3757,7 @@ msgstr "Modo GameController do SDL"
 
 #: xrc/JoypadConfig.xrc:21
 msgid "Autofire Throttle (frames):"
-msgstr ""
+msgstr "Acelerador de Auto-Fire (frames):"
 
 #: xrc/JoypadConfig.xrc:40
 msgid "Player 1"
