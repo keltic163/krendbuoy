@@ -1406,13 +1406,6 @@ static void debugCloseSock()
 
 bool debugStartListen(int port)
 {
-    // wxSocket must be initialized before any socket is created. On macOS the
-    // socket subsystem is not brought up for us if the app didn't use wxNet
-    // elsewhere, which leaves wxSocketServer with a null internal impl so
-    // IsOk() is false *and* LastError() null-derefs. Initialize() is
-    // idempotent, so calling it here is safe on every path.
-    wxSocketBase::Initialize();
-
     delete debug_server; // should never be necessary
     delete debug_remote;
     debug_remote = NULL;
