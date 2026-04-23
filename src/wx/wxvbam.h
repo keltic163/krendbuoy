@@ -686,6 +686,7 @@ public:
 
 private:
     wxTextCtrl* log;
+    size_t shown_len_ = 0;
     void Save(wxCommandEvent& ev);
     void Clear(wxCommandEvent& ev);
 

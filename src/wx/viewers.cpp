@@ -570,9 +570,19 @@ dialogs::BaseDialog(NULL, "Logging") {
 
 void LogDialog::Update()
 {
-    wxString l = wxGetApp().log;
-    log->SetValue(l);
-    log->ShowPosition(l.size() > 2 ? l.size() - 2 : 0);
+    const wxString& l = wxGetApp().log;
+
+    // Buffer was cleared or truncated out from under us — resync from scratch.
+    if (shown_len_ > l.size()) {
+        log->Clear();
+        shown_len_ = 0;
+    }
+
+    if (shown_len_ < l.size()) {
+        log->AppendText(l.Mid(shown_len_));
+        shown_len_ = l.size();
+        log->ShowPosition(shown_len_ > 2 ? shown_len_ - 2 : 0);
+    }
 }
 
 void LogDialog::Save(wxCommandEvent& ev)
@@ -609,7 +619,8 @@ void LogDialog::Clear(wxCommandEvent& ev)
 {
     (void)ev; // unused params
     wxGetApp().log.clear();
-    Update();
+    log->Clear();
+    shown_len_ = 0;
 }
 
 BEGIN_EVENT_TABLE(LogDialog, wxDialog)

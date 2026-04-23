@@ -1447,6 +1447,26 @@ void log(const char* defaultMsg, ...)
     vsnprintf(buf, 2048, defaultMsg, valist);
     wxString msg = wxString(buf, wxConvUTF8);
     va_end(valist);
+
+    // Collapse runs of identical consecutive messages. Without this, a caller
+    // that logs the same line every frame blows up the log buffer and the
+    // wxTextCtrl redraw cost until the UI locks.
+    static wxString last_msg;
+    static unsigned long duplicate_count = 0;
+
+    if (msg == last_msg) {
+        ++duplicate_count;
+        return;
+    }
+
+    if (duplicate_count > 0) {
+        wxGetApp().log.append(
+            wxString::Format(wxT("(previous line repeated %lu times)\n"),
+                             duplicate_count));
+        duplicate_count = 0;
+    }
+
+    last_msg = msg;
     wxGetApp().log.append(msg);
 
     if (wxGetApp().IsMainLoopRunning()) {

@@ -1489,7 +1489,7 @@ public:
 
     void DoSetThrottleSel(uint32_t val)
     {
-        if (val <= 450)
+        if (val <= kMaxThrottlePercent)
             thrsel->SetSelection(std::round((double)val / 25));
         else
             thrsel->SetSelection(100 / 25);
@@ -1501,7 +1501,7 @@ public:
         (void)evt; // unused params
         uint32_t val = thrsel->GetSelection() * 25;
 
-        if (val <= 450)
+        if (val <= kMaxThrottlePercent)
             thr->SetValue(val);
         else
             thr->SetValue(100);

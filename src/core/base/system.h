@@ -50,6 +50,11 @@ struct EmulatedSystem {
     int emuCount;
 };
 
+// Upper bound on the emulator throttle, expressed as a percentage of normal
+// speed. Values above this are rejected by the UI and SDL front-end. 0 is a
+// special value meaning "unlimited".
+constexpr uint32_t kMaxThrottlePercent = 1000;
+
 // The `coreOptions` object must be instantiated by the embedder.
 extern struct CoreOptions {
     bool cpuIsMultiBoot = false;

@@ -354,7 +354,11 @@ void LoadConfig()
 	soundFiltering = (float)ReadPref("gbaSoundFiltering", 50) / 100.0f;
 	g_gbaSoundInterpolation = ReadPref("gbaSoundInterpolation", 1);
 	coreOptions.throttle = ReadPref("throttle", 100);
+	if (coreOptions.throttle > kMaxThrottlePercent)
+		coreOptions.throttle = kMaxThrottlePercent;
 	coreOptions.speedup_throttle = ReadPref("speedupThrottle", 100);
+	if (coreOptions.speedup_throttle > kMaxThrottlePercent)
+		coreOptions.speedup_throttle = kMaxThrottlePercent;
 	coreOptions.speedup_frame_skip = ReadPref("speedupFrameSkip", 9);
 	coreOptions.speedup_throttle_frame_skip = ReadPref("speedupThrottleFrameSkip", 0);
 	coreOptions.speedup_mute = ReadPref("speedupMute", 1);
@@ -822,8 +826,12 @@ int ReadOpts(int argc, char ** argv)
 			}
 			break;
 		case 'T':
-			if (optarg)
-				coreOptions.throttle = atoi(optarg);
+			if (optarg) {
+				int v = atoi(optarg);
+				if (v < 0) v = 0;
+				if (v > static_cast<int>(kMaxThrottlePercent)) v = kMaxThrottlePercent;
+				coreOptions.throttle = v;
+			}
 			break;
 		case 'I':
 			if (optarg) {

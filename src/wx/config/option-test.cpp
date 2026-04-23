@@ -4,6 +4,7 @@
 
 #include <wx/log.h>
 
+#include "core/base/system.h"
 #include "wx/config/option-id.h"
 #include "wx/config/option-proxy.h"
 
@@ -128,6 +129,29 @@ TEST(OptionTest, Unsigned) {
     EXPECT_DEATH(option->SetAudioApi(config::AudioApi::kSDL), "is_audio_api\\(\\)");
     EXPECT_DEATH(option->SetAudioRate(config::AudioRate::k11kHz), "is_audio_rate\\(\\)");
     EXPECT_DEATH(option->SetGbPalette({0, 1, 2, 3, 4, 5, 6, 7}), "is_gb_palette\\(\\)");
+}
+
+TEST(OptionTest, ThrottleClampedToRealisticMax) {
+    const wxLogNull disable_logging;
+
+    EXPECT_EQ(kMaxThrottlePercent, 1000u);
+
+    for (config::OptionID id : {config::OptionID::kPrefThrottle,
+                                config::OptionID::kPrefSpeedupThrottle}) {
+        config::Option* option = config::Option::ByID(id);
+        ASSERT_TRUE(option);
+        ASSERT_TRUE(option->is_unsigned());
+
+        EXPECT_TRUE(option->SetUnsigned(0));
+        EXPECT_TRUE(option->SetUnsigned(kMaxThrottlePercent));
+        EXPECT_EQ(option->GetUnsigned(), kMaxThrottlePercent);
+
+        EXPECT_FALSE(option->SetUnsigned(kMaxThrottlePercent + 1));
+        EXPECT_EQ(option->GetUnsigned(), kMaxThrottlePercent);
+
+        EXPECT_FALSE(option->SetUnsigned(5000));
+        EXPECT_EQ(option->GetUnsigned(), kMaxThrottlePercent);
+    }
 }
 
 TEST(OptionTest, String) {
