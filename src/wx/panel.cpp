@@ -3011,7 +3011,9 @@ private:
             // back then folds the format conversion with the shared-mem read,
             // avoiding two full-frame memcpys per call.
             const size_t srcBytes = static_cast<size_t>(paddedSrcPitch) * paddedHeight;
+#ifdef VBAM_RPI_PROXY_SUPPORT
             const size_t dstBytes = static_cast<size_t>(outstride) * scaled_height;
+#endif
             uint8_t* src_buffer = nullptr;
             uint8_t* dst_buffer = dst_;
             std::vector<uint8_t> src_fallback;
