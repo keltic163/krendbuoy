@@ -697,7 +697,18 @@ void BIOS_LZ77UnCompVram()
                 int offset = (data & 0x0FFF);
                 uint32_t windowOffset = dest + byteCount - offset - 1;
                 for (int i2 = 0; i2 < length; i2++) {
-                    writeValue |= (CPUReadByte(windowOffset++) << byteShift);
+                    // VRAM can only be written as halfwords, so one byte may
+                    // sit unflushed in writeValue. If the LZ77 back-reference
+                    // points into that pending byte, read it from writeValue
+                    // rather than VRAM (where the write hasn't happened yet).
+                    uint8_t b;
+                    if (byteCount > 0 && windowOffset >= dest && windowOffset < dest + (uint32_t)byteCount) {
+                        b = (uint8_t)(writeValue >> ((windowOffset - dest) * 8));
+                    } else {
+                        b = CPUReadByte(windowOffset);
+                    }
+                    windowOffset++;
+                    writeValue |= (b << byteShift);
                     byteShift += 8;
                     byteCount++;
 

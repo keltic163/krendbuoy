@@ -134,6 +134,16 @@ uint32_t dma2Source = 0;
 uint32_t dma2Dest = 0;
 uint32_t dma3Source = 0;
 uint32_t dma3Dest = 0;
+// Counts latched at the moment DMAxCTL is written with the enable bit set.
+// GBA hardware latches source, destination, *and* count when a transfer is
+// scheduled, so later writes to DMAxCNT_L from an IRQ handler do not affect
+// a queued vblank/hblank DMA. Using the live DMxCNT_L register at run time
+// lets such writes corrupt the queued count (observed as partial portrait
+// tile copies in Sangokushi Eiketsuden).
+uint32_t dma0Count = 0;
+uint32_t dma1Count = 0;
+uint32_t dma2Count = 0;
+uint32_t dma3Count = 0;
 void (*cpuSaveGameFunc)(uint32_t, uint8_t) = flashSaveDecide;
 void (*renderLine)() = mode0RenderLine;
 bool fxOn = false;
@@ -2812,7 +2822,7 @@ void CPUCheckDMA(int reason, int dmamask)
             }
 #endif
             doDMA(0, dma0Source, dma0Dest, sourceIncrement, destIncrement,
-                DM0CNT_L ? DM0CNT_L : 0x4000,
+                dma0Count ? dma0Count : 0x4000,
                 DM0CNT_H & 0x0400, false);
 
             if (DM0CNT_H & 0x4000) {
@@ -2879,7 +2889,7 @@ void CPUCheckDMA(int reason, int dmamask)
                 }
 #endif
                 doDMA(1, dma1Source, dma1Dest, sourceIncrement, destIncrement,
-                    DM1CNT_L ? DM1CNT_L : 0x4000,
+                    dma1Count ? dma1Count : 0x4000,
                     DM1CNT_H & 0x0400, false);
             }
 
@@ -2948,7 +2958,7 @@ void CPUCheckDMA(int reason, int dmamask)
                 }
 #endif
                 doDMA(2, dma2Source, dma2Dest, sourceIncrement, destIncrement,
-                    DM2CNT_L ? DM2CNT_L : 0x4000,
+                    dma2Count ? dma2Count : 0x4000,
                     DM2CNT_H & 0x0400, false);
             }
 
@@ -3005,7 +3015,7 @@ void CPUCheckDMA(int reason, int dmamask)
             }
 #endif
             doDMA(3, dma3Source, dma3Dest, sourceIncrement, destIncrement,
-                DM3CNT_L ? DM3CNT_L : 0x10000,
+                dma3Count ? dma3Count : 0x10000,
                 DM3CNT_H & 0x0400, false);
 
             if (DM3CNT_H & 0x4000) {
@@ -3315,6 +3325,7 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         if (start && (value & 0x8000)) {
             dma0Source = DM0SAD_L | (DM0SAD_H << 16);
             dma0Dest = DM0DAD_L | (DM0DAD_H << 16);
+            dma0Count = DM0CNT_L;
             CPUCheckDMA(0, 1);
         }
     } break;
@@ -3349,6 +3360,7 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         if (start && (value & 0x8000)) {
             dma1Source = DM1SAD_L | (DM1SAD_H << 16);
             dma1Dest = DM1DAD_L | (DM1DAD_H << 16);
+            dma1Count = DM1CNT_L;
             CPUCheckDMA(0, 2);
         }
     } break;
@@ -3384,6 +3396,7 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         if (start && (value & 0x8000)) {
             dma2Source = DM2SAD_L | (DM2SAD_H << 16);
             dma2Dest = DM2DAD_L | (DM2DAD_H << 16);
+            dma2Count = DM2CNT_L;
 
             CPUCheckDMA(0, 4);
         }
@@ -3420,6 +3433,7 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         if (start && (value & 0x8000)) {
             dma3Source = DM3SAD_L | (DM3SAD_H << 16);
             dma3Dest = DM3DAD_L | (DM3DAD_H << 16);
+            dma3Count = DM3CNT_L;
             CPUCheckDMA(0, 8);
         }
     } break;

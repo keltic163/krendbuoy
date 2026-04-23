@@ -25,6 +25,7 @@
 #include <wx/mstream.h>
 #include <wx/protocol/http.h>
 #include <wx/regex.h>
+#include <wx/socket.h>
 #include <wx/spinctrl.h>
 #include <wx/textctrl.h>
 #include <wx/combobox.h>
@@ -552,6 +553,11 @@ bool wxvbamApp::OnInit() {
         SetAppearance(Appearance::System);
     }
 #endif
+
+    // Initialize wxSocket early so the GDB debug stub can bind reliably on
+    // macOS. If we defer this until the Debug menu handler, wxSocketServer
+    // constructs with a null impl and LastError() null-derefs.
+    wxSocketBase::Initialize();
 
     // use consistent names for config, DO NOT TRANSLATE
     SetAppName("visualboyadvance-m");

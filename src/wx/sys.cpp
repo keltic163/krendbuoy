@@ -1406,21 +1406,38 @@ static void debugCloseSock()
 
 bool debugStartListen(int port)
 {
+    // wxSocket must be initialized before any socket is created. On macOS the
+    // socket subsystem is not brought up for us if the app didn't use wxNet
+    // elsewhere, which leaves wxSocketServer with a null internal impl so
+    // IsOk() is false *and* LastError() null-derefs. Initialize() is
+    // idempotent, so calling it here is safe on every path.
+    wxSocketBase::Initialize();
+
     delete debug_server; // should never be necessary
     delete debug_remote;
     debug_remote = NULL;
     wxIPV4address addr;
-    addr.Service(port);
-    addr.AnyAddress(); // probably ought to have a flag to select any/localhost
+    // Service() must be called *after* AnyAddress(), because AnyAddress()
+    // can reset the port on some wx builds. Without this the server binds
+    // to port 0 and is effectively unreachable.
+    addr.AnyAddress();
+    if (!addr.Service(port)) {
+        wxLogError(_("Invalid GDB server port %d"), port);
+        return false;
+    }
     debug_server = new wxSocketServer(addr, wxSOCKET_REUSEADDR);
     remoteSendFnc = debugWriteSock;
     remoteRecvFnc = debugReadSock;
     remoteCleanUpFnc = debugCloseSock;
 
-    if (debug_server->IsOk())
+    if (debug_server && debug_server->IsOk())
         return true;
 
-    wxLogError(_("Error setting up server socket (%d)"), debug_server->LastError());
+    // Do not call debug_server->LastError() here: when IsOk() is false the
+    // internal impl pointer may be null and LastError() dereferences it.
+    wxLogError(_("Error setting up GDB server socket on port %d"), port);
+    delete debug_server;
+    debug_server = NULL;
     return false;
 }
 
