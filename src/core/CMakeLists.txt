@@ -90,6 +90,11 @@ target_sources(vbam-core
     gba/gbaSound.h
 )
 
+# elfio
+target_include_directories(vbam-core
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/include
+)
+
 target_include_directories(vbam-core
     PUBLIC ${ZLIB_INCLUDE_DIR}
 )
@@ -126,11 +131,6 @@ if(ENABLE_LINK)
 
     target_link_libraries(vbam-core
         PRIVATE ${SFML_LIBRARIES}
-    )
-
-    # elfio
-    target_include_directories(vbam-core
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/include
     )
 
     # Add libintl.h
