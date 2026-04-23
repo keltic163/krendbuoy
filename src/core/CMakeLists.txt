@@ -130,7 +130,7 @@ if(ENABLE_LINK)
 
     # elfio
     target_include_directories(vbam-core
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/include
     )
 
     # Add libintl.h
