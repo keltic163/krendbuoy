@@ -13,59 +13,11 @@ enum LocationType { LOCATION_register,
 #define DW_ATE_unsigned 0x07
 #define DW_ATE_unsigned_char 0x08
 
-struct ELFHeader {
-    uint32_t magic;
-    uint8_t clazz;
-    uint8_t data;
-    uint8_t version;
-    uint8_t pad[9];
-    uint16_t e_type;
-    uint16_t e_machine;
-    uint32_t e_version;
-    uint32_t e_entry;
-    uint32_t e_phoff;
-    uint32_t e_shoff;
-    uint32_t e_flags;
-    uint16_t e_ehsize;
-    uint16_t e_phentsize;
-    uint16_t e_phnum;
-    uint16_t e_shentsize;
-    uint16_t e_shnum;
-    uint16_t e_shstrndx;
-};
-
-struct ELFProgramHeader {
-    uint32_t type;
-    uint32_t offset;
-    uint32_t vaddr;
-    uint32_t paddr;
-    uint32_t filesz;
-    uint32_t memsz;
-    uint32_t flags;
-    uint32_t align;
-};
-
-struct ELFSectionHeader {
-    uint32_t name;
-    uint32_t type;
-    uint32_t flags;
-    uint32_t addr;
-    uint32_t offset;
-    uint32_t size;
-    uint32_t link;
-    uint32_t info;
-    uint32_t addralign;
-    uint32_t entsize;
-};
-
-struct ELFSymbol {
-    uint32_t name;
-    uint32_t value;
-    uint32_t size;
-    uint8_t info;
-    uint8_t other;
-    uint16_t shndx;
-};
+// ELF container parsing is delegated to the elfio library; the legacy
+// ELFHeader / ELFProgramHeader / ELFSectionHeader / ELFSymbol structs that
+// used to mirror the on-disk layout have been removed. DWARF-specific types
+// below are still produced by the hand-rolled parser and consumed by the
+// debugger UI.
 
 struct ELFBlock {
     int length;
