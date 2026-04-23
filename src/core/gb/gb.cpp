@@ -614,6 +614,7 @@ uint8_t gbBgpLine[300];
 uint8_t gbObp0Line[300];
 uint8_t gbObp1Line[300];
 uint8_t gbSpritesTicks[300];
+uint8_t gbOAMLatch[0xa0];
 uint8_t oldRegister_WY;
 bool gbLYChangeHappened = false;
 bool gbLCDChangeHappened = false;
@@ -1893,6 +1894,13 @@ void gbWriteMemory(uint16_t address, uint8_t value)
         if ((register_LY <= register_WY) && ((gbWindowLine < 0) || (gbWindowLine >= (int)kGBHeight))) {
             gbWindowLine = -1;
             oldRegister_WY = register_WY;
+        } else if ((register_LY > register_WY) && (gbWindowLine < 0)) {
+            // WY written behind the current scanline mid-frame: the window
+            // trigger (LY == WY at mode 2 entry) has already been missed.
+            // Mark as skipped so HBlank does not propagate the new WY into
+            // oldRegister_WY, which would incorrectly activate the window
+            // for the remainder of the frame.
+            gbWindowLine = 146;
         }
         return;
 
@@ -4466,6 +4474,10 @@ void gbEmulate(int ticksToStop)
 
                         // OAM being accessed mode
                         // next mode is OAM and VRAM in use
+                        // Snapshot OAM at mode 2 entry. Real GBC hardware locks OAM
+                        // during modes 2 and 3, so both pipeline passes must see the
+                        // same OAM state.
+                        memcpy(gbOAMLatch, &gbMemory[0xfe00], 0xa0);
                         if ((gbScreenOn) && (register_LCDC & 0x80)) {
                             gbDrawSprites(false);
                             // Used to add a one tick delay when a window line is drawn.
