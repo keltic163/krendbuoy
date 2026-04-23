@@ -128,6 +128,11 @@ if(ENABLE_LINK)
         PRIVATE ${SFML_LIBRARIES}
     )
 
+    # elfio
+    target_include_directories(vbam-core
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
     # Add libintl.h
     target_include_directories(vbam-core
         PRIVATE ${LIBINTL_INC}
