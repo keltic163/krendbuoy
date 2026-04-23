@@ -2564,7 +2564,7 @@ void elfReadSymtab()
     const ELFIO::Elf_Xword total = syms.get_symbols_num();
 
     elfSymbolsCount = 0;
-    elfSymbols = (Symbol*)malloc(sizeof(Symbol) * (total > 0 ? total : 1));
+    elfSymbols = (Symbol*)malloc((size_t)(sizeof(Symbol) * (total > 0 ? total : 1)));
 
     // Stash the linked string table so lifetime matches elfio's storage; we
     // stage copies into a persistent per-symbol name buffer below.
