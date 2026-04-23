@@ -11,7 +11,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: VBA-M\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-21 15:59+0000\n"
+"POT-Creation-Date: 2026-04-23 18:00+0000\n"
 "PO-Revision-Date: 2011-12-03 19:42+0000\n"
 "Last-Translator: David Rebolo Magariños <drgaga345@gmail.com>, 2021\n"
 "Language-Team: Galician (http://app.transifex.com/bgk/vba-m/language/gl/)\n"
@@ -43,7 +43,7 @@ msgstr ""
 msgid "Failed to start CoreAudio queue: error %d"
 msgstr ""
 
-#: cmdevents.cpp:68 wxvbam.cpp:823
+#: cmdevents.cpp:68 wxvbam.cpp:829
 msgid "Could not create main window"
 msgstr "Non se pode crear a xanela principal"
 
@@ -216,7 +216,7 @@ msgid "Error saving snapshot file %s"
 msgstr "Erro gardando ficheiro de instantánea %s"
 
 #: cmdevents.cpp:788 cmdevents.cpp:869 cmdevents.cpp:942 cmdevents.cpp:1014
-#: gfxviewers.cpp:1716 gfxviewers.cpp:1884 viewers.cpp:588 viewers.cpp:808
+#: gfxviewers.cpp:1716 gfxviewers.cpp:1884 viewers.cpp:598 viewers.cpp:819
 #: viewsupt.cpp:1198
 msgid "Select output file"
 msgstr "Selecciona o ficheiro de saída"
@@ -783,7 +783,7 @@ msgstr "Houbo un problema ao cargar o ficheiro"
 msgid "Unable to load Game Boy ROM %s"
 msgstr "Non se puido cargar a ROM Game Boy %s"
 
-#: panel.cpp:813 panel.cpp:957 panel.cpp:1843
+#: panel.cpp:813 panel.cpp:957 panel.cpp:1850
 msgid "Could not initialize the sound driver!"
 msgstr "Non se puido iniciar o controlador de son!"
 
@@ -816,7 +816,7 @@ msgid ""
 "Please check your configured path in Options > Directories."
 msgstr ""
 
-#: panel.cpp:1190 panel.cpp:1211 wxvbam.cpp:1362
+#: panel.cpp:1190 panel.cpp:1211 wxvbam.cpp:1404
 msgid "Directory Error"
 msgstr ""
 
@@ -874,552 +874,552 @@ msgstr ""
 msgid "Failed to change mode to %d x %d - %d @ %d"
 msgstr ""
 
-#: panel.cpp:1770
+#: panel.cpp:1777
 msgid "Not a valid Game Boy Advance cartridge"
 msgstr ""
 
-#: panel.cpp:1864
+#: panel.cpp:1871
 msgid "Metal is unavailable, defaulting to OpenGL"
 msgstr ""
 
-#: panel.cpp:1897
+#: panel.cpp:1904
 msgid "Vulkan is unavailable, defaulting to OpenGL"
 msgstr ""
 
-#: panel.cpp:2036
+#: panel.cpp:2043
 msgid "No memory for rewinding"
 msgstr "Non hai memoria para o rebobinado"
 
-#: panel.cpp:2046
+#: panel.cpp:2053
 msgid "Error writing rewind state"
 msgstr "Erro escribindo avance rebobinado"
 
-#: panel.cpp:3614
+#: panel.cpp:3668
 msgid "Failed to set wayland display"
 msgstr ""
 
-#: panel.cpp:3645
+#: panel.cpp:3699
 msgid "Failed to initialize SDL video subsystem"
 msgstr ""
 
-#: panel.cpp:3656
+#: panel.cpp:3710
 msgid "Failed to initialize SDL video"
 msgstr ""
 
-#: panel.cpp:3666
+#: panel.cpp:3720
 msgid "Failed to set wayland surface"
 msgstr ""
 
-#: panel.cpp:3680
+#: panel.cpp:3734
 msgid "Failed to set parent window"
 msgstr ""
 
-#: panel.cpp:3691
+#: panel.cpp:3745
 msgid "Failed to set OpenGL properties"
 msgstr ""
 
-#: panel.cpp:3704 panel.cpp:3743
+#: panel.cpp:3758 panel.cpp:3797
 msgid "Failed to create SDL window"
 msgstr ""
 
-#: panel.cpp:3714 panel.cpp:3771
+#: panel.cpp:3768 panel.cpp:3825
 msgid "Renderer creating failed, using default renderer"
 msgstr ""
 
-#: panel.cpp:3715
+#: panel.cpp:3769
 #, c-format
 msgid "SDL Error: %s"
 msgstr ""
 
-#: panel.cpp:3722 panel.cpp:3777
+#: panel.cpp:3776 panel.cpp:3831
 msgid "Failed to create SDL renderer"
 msgstr ""
 
-#: panel.cpp:3728
+#: panel.cpp:3782
 msgid "Failed to set vsync for SDL renderer"
 msgstr ""
 
-#: panel.cpp:3732 panel.cpp:3766
+#: panel.cpp:3786 panel.cpp:3820
 #, c-format
 msgid "SDL renderer: %s"
 msgstr ""
 
-#: panel.cpp:3751
+#: panel.cpp:3805
 msgid "SDL renderer: default"
 msgstr ""
 
-#: panel.cpp:4534
+#: panel.cpp:4588
 msgid "Enabling EGL VSync."
 msgstr ""
 
-#: panel.cpp:4536
+#: panel.cpp:4590
 msgid "Disabling EGL VSync."
 msgstr ""
 
-#: panel.cpp:4544
+#: panel.cpp:4598
 msgid "Enabling GLX VSync."
 msgstr ""
 
-#: panel.cpp:4546
+#: panel.cpp:4600
 msgid "Disabling GLX VSync."
 msgstr ""
 
-#: panel.cpp:4564
+#: panel.cpp:4618
 msgid "Failed to set glXSwapIntervalEXT"
 msgstr "Erro ao estabelecer glXSwapIntervalEXT"
 
-#: panel.cpp:4573
+#: panel.cpp:4627
 msgid "Failed to set glXSwapIntervalSGI"
 msgstr "Erro ao estabelecer glXSwapIntervalSGI"
 
-#: panel.cpp:4582
+#: panel.cpp:4636
 msgid "Failed to set glXSwapIntervalMESA"
 msgstr "Erro ao estabelecer glXSwapIntervalMESA"
 
-#: panel.cpp:4591
+#: panel.cpp:4645
 msgid "No support for wglGetExtensionsStringEXT"
 msgstr "Sen asistencia para wglGetExtensionsStringEXT"
 
-#: panel.cpp:4594
+#: panel.cpp:4648
 msgid "No support for WGL_EXT_swap_control"
 msgstr "Sen asistencia para WGL_EXT_swap_control"
 
-#: panel.cpp:4603
+#: panel.cpp:4657
 msgid "Failed to set wglSwapIntervalEXT"
 msgstr "Erro ao estabelecer wglSwapIntervalEXT"
 
-#: panel.cpp:4609
+#: panel.cpp:4663
 msgid "No VSYNC available on this platform"
 msgstr "A VSYNC non está dispoñíbel nesta plataforma"
 
-#: panel.cpp:4742
+#: panel.cpp:4796
 msgid "Failed to load D3D12 or D3DCompiler DLLs"
 msgstr ""
 
-#: panel.cpp:4768
+#: panel.cpp:4822
 msgid "Failed to get D3D12 function pointers"
 msgstr ""
 
-#: panel.cpp:4773
+#: panel.cpp:4827
 #, c-format
 msgid "Failed to create DXGI factory: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4787
+#: panel.cpp:4841
 msgid "No hardware adapter found, falling back to WARP"
 msgstr ""
 
-#: panel.cpp:4794
+#: panel.cpp:4848
 #, c-format
 msgid "Failed to create D3D12 device: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4795
+#: panel.cpp:4849
 #, c-format
 msgid "D3D12 device created (%s)"
 msgstr ""
 
-#: panel.cpp:4802
+#: panel.cpp:4856
 #, c-format
 msgid "Failed to create command queue: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4823
+#: panel.cpp:4877
 #, c-format
 msgid "Failed to create swap chain: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4829
+#: panel.cpp:4883
 #, c-format
 msgid "Failed to get IDXGISwapChain3: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4838
+#: panel.cpp:4892
 #, c-format
 msgid "Failed to create RTV heap: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4847
+#: panel.cpp:4901
 #, c-format
 msgid "Failed to create SRV heap: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4854
+#: panel.cpp:4908
 #, c-format
 msgid "Failed to get back buffer %u: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4862
+#: panel.cpp:4916
 #, c-format
 msgid "Failed to create command allocator: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4867
+#: panel.cpp:4921
 #, c-format
 msgid "Failed to create command list: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4906
+#: panel.cpp:4960
 #, c-format
 msgid "Failed to serialize root signature: %s"
 msgstr ""
 
-#: panel.cpp:4913
+#: panel.cpp:4967
 #, c-format
 msgid "Failed to create root signature: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4927
+#: panel.cpp:4981
 #, c-format
 msgid "VS compile failed: %s"
 msgstr ""
 
-#: panel.cpp:4935
+#: panel.cpp:4989
 #, c-format
 msgid "PS compile failed: %s"
 msgstr ""
 
-#: panel.cpp:4964
+#: panel.cpp:5018
 #, c-format
 msgid "Failed to create PSO: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4984
+#: panel.cpp:5038
 #, c-format
 msgid "Failed to create vertex buffer: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4993
+#: panel.cpp:5047
 #, c-format
 msgid "Failed to create fence: 0x%08X"
 msgstr ""
 
-#: panel.cpp:4996
+#: panel.cpp:5050
 msgid "Failed to create fence event"
 msgstr ""
 
-#: panel.cpp:4998
+#: panel.cpp:5052
 msgid "D3D12 pipeline fully initialized"
 msgstr ""
 
-#: panel.cpp:5028
+#: panel.cpp:5082
 #, c-format
 msgid "DX12DrawingPanel initialized: %dx%d (scale: %f)"
 msgstr ""
 
-#: panel.cpp:5050
+#: panel.cpp:5104
 #, c-format
 msgid "ResizeBuffers failed: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5061
+#: panel.cpp:5115
 #, c-format
 msgid "Swap chain resized to %dx%d"
 msgstr ""
 
-#: panel.cpp:5313
+#: panel.cpp:5367
 msgid "Texture upload failed"
 msgstr ""
 
-#: panel.cpp:5456
+#: panel.cpp:5510
 msgid "Using Direct3D 9Ex (dynamically loaded)"
 msgstr ""
 
-#: panel.cpp:5460
+#: panel.cpp:5514
 msgid "Failed to load d3d9.dll"
 msgstr ""
 
-#: panel.cpp:5469
+#: panel.cpp:5523
 msgid "Failed to create Direct3D 9 interface"
 msgstr ""
 
-#: panel.cpp:5472
+#: panel.cpp:5526
 msgid "Using Direct3D 9"
 msgstr ""
 
-#: panel.cpp:5479
+#: panel.cpp:5533
 #, c-format
 msgid "Failed to get adapter display mode: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5503
+#: panel.cpp:5557
 msgid "FlipEx not supported, falling back to Discard swap effect"
 msgstr ""
 
-#: panel.cpp:5519
+#: panel.cpp:5573
 msgid "Hardware vertex processing not available, falling back to software"
 msgstr ""
 
-#: panel.cpp:5543
+#: panel.cpp:5597
 #, c-format
 msgid "Failed to create Direct3D device: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5548
+#: panel.cpp:5602
 #, c-format
 msgid "Direct3D 9%s device created successfully (SwapEffect: %s)"
 msgstr ""
 
-#: panel.cpp:5581
+#: panel.cpp:5635
 #, c-format
 msgid "DXDrawingPanel initialized: %dx%d (scale: %f)"
 msgstr ""
 
-#: panel.cpp:5603
+#: panel.cpp:5657
 #, c-format
 msgid "Failed to get adapter display mode for reset: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5635
+#: panel.cpp:5689
 #, c-format
 msgid "Attempting Direct3D device reset (SwapEffect: %s)"
 msgstr ""
 
-#: panel.cpp:5642
+#: panel.cpp:5696
 msgid "Reset with FlipEx failed, retrying with Discard swap effect"
 msgstr ""
 
-#: panel.cpp:5654
+#: panel.cpp:5708
 #, c-format
 msgid "Failed to reset Direct3D device: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5659
+#: panel.cpp:5713
 #, c-format
 msgid "Direct3D device reset successfully (Final SwapEffect: %s)"
 msgstr ""
 
-#: panel.cpp:5727
+#: panel.cpp:5781
 #, c-format
 msgid "Failed to create texture: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5739
+#: panel.cpp:5793
 #, c-format
 msgid "Failed to lock texture: 0x%08X"
 msgstr ""
 
-#: panel.cpp:5931
+#: panel.cpp:5985
 msgid "Memory allocation error"
 msgstr ""
 
-#: panel.cpp:5934
+#: panel.cpp:5988
 msgid "Error initializing codec"
 msgstr ""
 
-#: panel.cpp:5937
+#: panel.cpp:5991
 msgid "Error writing to output file"
 msgstr ""
 
-#: panel.cpp:5940
+#: panel.cpp:5994
 msgid "Can't guess output format from file name"
 msgstr ""
 
-#: panel.cpp:5945
+#: panel.cpp:5999
 msgid "Programming error; aborting!"
 msgstr ""
 
-#: panel.cpp:5957 panel.cpp:5986
+#: panel.cpp:6011 panel.cpp:6040
 #, c-format
 msgid "Unable to begin recording to %s (%s)"
 msgstr "Non se puido comezar a gravar a %s (%s)"
 
-#: panel.cpp:6014
+#: panel.cpp:6068
 #, c-format
 msgid "Error in audio / video recording (%s); aborting"
 msgstr ""
 
-#: panel.cpp:6020
+#: panel.cpp:6074
 #, c-format
 msgid "Error in audio recording (%s); aborting"
 msgstr "Erro gravando audio (%s); abortando"
 
-#: panel.cpp:6030
+#: panel.cpp:6084
 #, c-format
 msgid "Error in video recording (%s); aborting"
 msgstr "Erro gravando vídeo (%s); abortando"
 
-#: panel.cpp:6225
+#: panel.cpp:6279
 #, c-format
 msgid "Volume: %d %%"
 msgstr ""
 
-#: panel.cpp:6747
+#: panel.cpp:6801
 msgid "Vulkan device created successfully"
 msgstr ""
 
-#: panel.cpp:6843
+#: panel.cpp:6897
 msgid ""
 "Neither VK_KHR_wayland_surface nor VK_KHR_xlib_surface is available — cannot"
 " create Vulkan surface on this system"
 msgstr ""
 
-#: panel.cpp:6871
+#: panel.cpp:6925
 #, c-format
 msgid "Failed to create Vulkan instance: %d"
 msgstr ""
 
-#: panel.cpp:6874
+#: panel.cpp:6928
 msgid "Vulkan instance created"
 msgstr ""
 
-#: panel.cpp:6889
+#: panel.cpp:6943
 #, c-format
 msgid "Failed to create Vulkan Win32 surface: %d"
 msgstr ""
 
-#: panel.cpp:6912
+#: panel.cpp:6966
 msgid "Failed to obtain NSView handle for Vulkan surface"
 msgstr ""
 
-#: panel.cpp:6923
+#: panel.cpp:6977
 #, c-format
 msgid "Failed to create Vulkan Metal surface: %d"
 msgstr ""
 
-#: panel.cpp:6941
+#: panel.cpp:6995
 #, c-format
 msgid "Failed to create Vulkan Xlib surface: %d"
 msgstr ""
 
-#: panel.cpp:6960
+#: panel.cpp:7014
 #, c-format
 msgid "Failed to create Vulkan Wayland surface: %d"
 msgstr ""
 
-#: panel.cpp:6999
+#: panel.cpp:7053
 msgid "Failed to obtain Wayland display/surface handles"
 msgstr ""
 
-#: panel.cpp:7013
+#: panel.cpp:7067
 msgid "No supported Vulkan surface extension available"
 msgstr ""
 
-#: panel.cpp:7024
+#: panel.cpp:7078
 msgid "No Vulkan physical devices found"
 msgstr ""
 
-#: panel.cpp:7074
+#: panel.cpp:7128
 #, c-format
 msgid "Selected Vulkan device: %s"
 msgstr ""
 
-#: panel.cpp:7078
+#: panel.cpp:7132
 msgid "No suitable Vulkan physical device found"
 msgstr ""
 
-#: panel.cpp:7117
+#: panel.cpp:7171
 #, c-format
 msgid "Failed to create Vulkan logical device: %d"
 msgstr ""
 
-#: panel.cpp:7204
+#: panel.cpp:7258
 #, c-format
 msgid "Failed to create Vulkan swapchain: %d"
 msgstr ""
 
-#: panel.cpp:7216
+#: panel.cpp:7270
 #, c-format
 msgid "Swapchain created: %ux%u, %u images, vsync=%s"
 msgstr ""
 
-#: panel.cpp:7260
+#: panel.cpp:7314
 #, c-format
 msgid "Failed to create swapchain image view %zu: %d"
 msgstr ""
 
-#: panel.cpp:7306
+#: panel.cpp:7360
 #, c-format
 msgid "Failed to create render pass: %d"
 msgstr ""
 
-#: panel.cpp:7328
+#: panel.cpp:7382
 #, c-format
 msgid "Failed to create framebuffer %zu: %d"
 msgstr ""
 
-#: panel.cpp:7351
+#: panel.cpp:7405
 #, c-format
 msgid "Failed to create descriptor set layout: %d"
 msgstr ""
 
-#: panel.cpp:7374
+#: panel.cpp:7428
 msgid "Failed to create shader modules"
 msgstr ""
 
-#: panel.cpp:7442
+#: panel.cpp:7496
 #, c-format
 msgid "Failed to create pipeline layout: %d"
 msgstr ""
 
-#: panel.cpp:7469
+#: panel.cpp:7523
 #, c-format
 msgid "Failed to create graphics pipeline: %d"
 msgstr ""
 
-#: panel.cpp:7485
+#: panel.cpp:7539
 #, c-format
 msgid "Failed to create command pool: %d"
 msgstr ""
 
-#: panel.cpp:7503
+#: panel.cpp:7557
 #, c-format
 msgid "Failed to allocate command buffers: %d"
 msgstr ""
 
-#: panel.cpp:7523
+#: panel.cpp:7577
 #, c-format
 msgid "Failed to create sync objects for frame %d"
 msgstr ""
 
-#: panel.cpp:7545
+#: panel.cpp:7599
 #, c-format
 msgid "Failed to create descriptor pool: %d"
 msgstr ""
 
-#: panel.cpp:7557
+#: panel.cpp:7611
 #, c-format
 msgid "Failed to allocate descriptor set: %d"
 msgstr ""
 
-#: panel.cpp:7595
+#: panel.cpp:7649
 #, c-format
 msgid "Failed to create texture image: %d"
 msgstr ""
 
-#: panel.cpp:7609
+#: panel.cpp:7663
 msgid "Failed to allocate texture memory"
 msgstr ""
 
-#: panel.cpp:7625
+#: panel.cpp:7679
 #, c-format
 msgid "Failed to create texture image view: %d"
 msgstr ""
 
-#: panel.cpp:7643
+#: panel.cpp:7697
 #, c-format
 msgid "Failed to create texture sampler: %d"
 msgstr ""
 
-#: panel.cpp:7677
+#: panel.cpp:7731
 msgid "Failed to create staging buffer"
 msgstr ""
 
-#: panel.cpp:7692
+#: panel.cpp:7746
 msgid "Failed to allocate staging memory"
 msgstr ""
 
-#: panel.cpp:7730
+#: panel.cpp:7784
 #, c-format
 msgid "VKDrawingPanel initialized: %ux%u (scale: %f)"
 msgstr ""
 
-#: panel.cpp:7768
+#: panel.cpp:7822
 #, c-format
 msgid "Failed to acquire swapchain image: %d"
 msgstr ""
 
-#: panel.cpp:8025
+#: panel.cpp:8079
 #, c-format
 msgid "Failed to present swapchain image: %d"
 msgstr ""
@@ -1489,20 +1489,25 @@ msgstr "Impreso"
 msgid "Error opening pseudo tty: %s"
 msgstr "Erro ao abrir pseudo tty: %s"
 
-#: sys.cpp:1423
+#: sys.cpp:1418
 #, c-format
-msgid "Error setting up server socket (%d)"
-msgstr "Erro ao axustar o socket do servidor (%d)"
+msgid "Invalid GDB server port %d"
+msgstr ""
 
-#: viewers.cpp:586
+#: sys.cpp:1431
+#, c-format
+msgid "Error setting up GDB server socket on port %d"
+msgstr ""
+
+#: viewers.cpp:596
 msgid "Text files (*.txt;*.log)|*.txt;*.log|"
 msgstr "Ficheiros de texto (*.txt;*.log)|*.txt;*.log|"
 
-#: viewers.cpp:731 viewers.cpp:806
+#: viewers.cpp:742 viewers.cpp:817
 msgid "Memory dumps (*.dmp;*.bin)|*.dmp;*.bin|"
 msgstr "Baleirados de memoria (*.dmp;*.bin)|*.dmp;*.bin|"
 
-#: viewers.cpp:733
+#: viewers.cpp:744
 msgid "Select memory dump file"
 msgstr "Selecciona ficheiro de baleirado de memoria"
 
@@ -1523,76 +1528,76 @@ msgstr ""
 msgid "Unable to load dialog %s from resources"
 msgstr "Non se puido cargar o diálogo %s dos recursos"
 
-#: wxvbam.cpp:640 wxvbam.cpp:657
+#: wxvbam.cpp:646 wxvbam.cpp:663
 #, c-format
 msgid "Invalid configuration file provided: %s"
 msgstr ""
 
-#: wxvbam.cpp:939
+#: wxvbam.cpp:945
 msgid "Save built-in XRC file and exit"
 msgstr "Gardar o ficheiro XRC integrado e saír"
 
-#: wxvbam.cpp:942
+#: wxvbam.cpp:948
 msgid "Save built-in vba-over.ini and exit"
 msgstr "Gardar vba-over.ini integrado e saír"
 
-#: wxvbam.cpp:945
+#: wxvbam.cpp:951
 msgid "Print configuration path and exit"
 msgstr "Imprimir camiño de configuración e saír"
 
-#: wxvbam.cpp:948
+#: wxvbam.cpp:954
 msgid "Start in full-screen mode"
 msgstr "Iniciar en modo pantalla completa"
 
-#: wxvbam.cpp:951
+#: wxvbam.cpp:957
 msgid "Set a configuration file"
 msgstr "Estabelecer un ficheiro de configuración"
 
-#: wxvbam.cpp:955
+#: wxvbam.cpp:961
 msgid "Delete shared link state first, if it exists"
 msgstr "Borrar estado da ligazón compartida, se existe"
 
-#: wxvbam.cpp:962
+#: wxvbam.cpp:968
 msgid "List all settable options and exit"
 msgstr "Enumera todas as opcións configurábeis e saír"
 
-#: wxvbam.cpp:965
+#: wxvbam.cpp:971
 msgid "ROM file"
 msgstr "Ficheiro ROM"
 
-#: wxvbam.cpp:967
+#: wxvbam.cpp:973
 msgid "<config>=<value>"
 msgstr "<config>=<value>"
 
-#: wxvbam.cpp:998
+#: wxvbam.cpp:1004
 msgid "Configuration / build error: can't find built-in xrc"
 msgstr ""
 
-#: wxvbam.cpp:1006
+#: wxvbam.cpp:1012
 #, c-format
 msgid ""
 "Wrote built-in configuration to %s.\n"
 "To override, remove all but changed root node(s). First found root node of correct name in any .xrc or .xrs files in following search path overrides built-in:"
 msgstr ""
 
-#: wxvbam.cpp:1020
+#: wxvbam.cpp:1026
 msgid "Configuration is read from, in order:"
 msgstr "A configuración lese dende, en orde:"
 
-#: wxvbam.cpp:1034
+#: wxvbam.cpp:1040
 #, c-format
 msgid ""
 "Wrote built-in override file to %s\n"
 "To override, delete all but changed section. First found section is used from search path:"
 msgstr ""
 
-#: wxvbam.cpp:1040
+#: wxvbam.cpp:1046
 msgid ""
 "\n"
 "\tbuilt-in"
 msgstr "\n\tintegrado"
 
-#: wxvbam.cpp:1055
+#: wxvbam.cpp:1061
 msgid ""
 "Options set from the command line are saved if any configuration changes are made in the user interface.\n"
 "\n"
@@ -1600,21 +1605,21 @@ msgid ""
 "\n"
 msgstr "As opcións estabelecidas dende a liña de comandos gárdanse se se fan cambios na interface de usuario.\n\nPara as opcións do indicador, certo e falso especifícanse como 1 e 0, respectivamente.\n\n"
 
-#: wxvbam.cpp:1063
+#: wxvbam.cpp:1069
 msgid ""
 "The commands available for the Keyboard/* option are:\n"
 "\n"
 msgstr "Os comandos dispoñíbeis para a opción teclado/* son:\n\n"
 
-#: wxvbam.cpp:1075
+#: wxvbam.cpp:1081
 msgid "Configuration file not found."
 msgstr "Non se atopa o ficheiro de configuración."
 
-#: wxvbam.cpp:1106
+#: wxvbam.cpp:1112
 msgid "Bad configuration option or multiple ROM files given:\n"
 msgstr "Mala opción de configuración ou proporcionáronse múltiples ficheiros ROM:\n"
 
-#: wxvbam.cpp:1361
+#: wxvbam.cpp:1403
 #, c-format
 msgid ""
 "Could not create directory:\n"
@@ -1623,7 +1628,7 @@ msgid ""
 "Please check your configured path in Options > Directories."
 msgstr ""
 
-#: wxvbam.cpp:1626
+#: wxvbam.cpp:1668
 msgid "Failed to load dialog"
 msgstr ""
 
