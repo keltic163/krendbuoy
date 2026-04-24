@@ -44,6 +44,7 @@ target_sources(vbam-core
     gba/gbaFlash.cpp
     gba/gbaGfx.cpp
     gba/gbaGlobals.cpp
+    gba/gbaMgbaLog.cpp
     gba/gbaMode0.cpp
     gba/gbaMode1.cpp
     gba/gbaMode2.cpp
@@ -85,6 +86,7 @@ target_sources(vbam-core
     gba/gbaGfx.h
     gba/gbaGlobals.h
     gba/gbaInline.h
+    gba/gbaMgbaLog.h
     gba/gbaPrint.h
     gba/gbaRtc.h
     gba/gbaSound.h

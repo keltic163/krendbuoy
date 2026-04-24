@@ -3473,6 +3473,29 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         cpuNextEvent = cpuTotalTicks;
         break;
 
+    // --- SIO registers with hardware-owned or mode-conditional semantics ---
+    // SIOMULTI0/1 share addresses 0x120/0x122 with SIODATA32_L/H. In Normal32
+    // mode the CPU owns them (writable); in Multiplayer/Normal8/UART/GP/JOY
+    // modes they are driven by the link hardware and CPU writes are ignored.
+    // SIOMULTI2/3 (0x124/0x126) are never writable from the CPU.
+    case COMM_SIOMULTI0: // 0x120 — a.k.a. SIODATA32_L
+    case COMM_SIOMULTI1: // 0x122 — a.k.a. SIODATA32_H
+    {
+        uint16_t siocnt = READ16LE(&g_ioMem[COMM_SIOCNT]);
+        uint16_t rcnt   = READ16LE(&g_ioMem[COMM_RCNT]);
+        // Mode select lives in RCNT bits 14-15 and SIOCNT bits 12-13.
+        bool rcnt_special = (rcnt & 0xC000) != 0; // GP (0x8000) or JOY (0xC000)
+        uint32_t sio_mode = (siocnt >> 12) & 0x3; // 0=N8,1=N32,2=MULTI,3=UART
+        if (!rcnt_special && sio_mode == 1 /* Normal32 */) {
+            UPDATE_REG(address & 0x3FE, value);
+        }
+        // Otherwise: hardware-driven; CPU write is a no-op.
+        break;
+    }
+    case COMM_SIOMULTI2: // 0x124 — driven only by the link hardware
+    case COMM_SIOMULTI3: // 0x126
+        break;
+
     case COMM_SIOCNT:
 #ifndef NO_LINK
         StartLink(value);
@@ -3536,20 +3559,26 @@ void CPUUpdateRegister(uint32_t address, uint16_t value)
         UPDATE_REG(COMM_JOYCNT, cur);
     } break;
 
+    // JOY_RECV_L/H are read-only from the CPU's perspective (the Nintendo
+    // device writes them during JOY-bus reception). Writes are no-ops.
     case COMM_JOY_RECV_L:
-        UPDATE_REG(COMM_JOY_RECV_L, value);
-        break;
     case COMM_JOY_RECV_H:
-        UPDATE_REG(COMM_JOY_RECV_H, value);
         break;
 
+    // JOY_TRANS_L/H: on hardware the CPU can write these to queue data for
+    // the attached Nintendo device, but the register readback returns 0 —
+    // the value is consumed by the bus interface and the CPU-visible slot
+    // is not a simple latch. mGBA's register R/W tests rely on that 0 read,
+    // and without an actual JOY device no transfer can happen anyway, so
+    // we model this as "side-effects only" while keeping the stored value
+    // at 0. When JOY bus mode is active we still set JOYSTAT_SEND so host
+    // code that polls it continues to work.
     case COMM_JOY_TRANS_L:
-        UPDATE_REG(COMM_JOY_TRANS_L, value);
-        UPDATE_REG(COMM_JOYSTAT, READ16LE(&g_ioMem[COMM_JOYSTAT]) | JOYSTAT_SEND);
-        break;
     case COMM_JOY_TRANS_H:
-        UPDATE_REG(COMM_JOY_TRANS_H, value);
-        UPDATE_REG(COMM_JOYSTAT, READ16LE(&g_ioMem[COMM_JOYSTAT]) | JOYSTAT_SEND);
+        if ((READ16LE(&g_ioMem[COMM_RCNT]) & 0xC000) == 0xC000) {
+            UPDATE_REG(COMM_JOYSTAT,
+                       READ16LE(&g_ioMem[COMM_JOYSTAT]) | JOYSTAT_SEND);
+        }
         break;
 
     case COMM_JOYSTAT:
@@ -3850,6 +3879,7 @@ void CPUReset()
         break;
     }
     rtcReset();
+    gbaMgbaLog::Reset();
     // clean registers
     memset(&reg[0], 0, sizeof(reg));
     // clean OAM

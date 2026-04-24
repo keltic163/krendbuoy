@@ -732,13 +732,12 @@ static void count(uint32_t opcode, int cond_res)
     }
 #endif
 // OP Rd,Rb,Rm LSL Rs
+// ARM7TDMI: reg[15] already carries the PC+12 bump applied in ALU_INSN, so
+// a direct read of any operand (Rm, Rs, Rn) correctly observes insn+12.
 #ifndef VALUE_LSL_REG_C
 #define VALUE_LSL_REG_C                                     \
     uint32_t shift = reg[(opcode >> 8) & 15].B.B0;          \
     uint32_t rm = reg[opcode & 0x0F].I;                     \
-    if ((opcode & 0x0F) == 15) {                            \
-        rm += 4;                                            \
-    }                                                       \
     if (LIKELY(shift)) {                                    \
         if (shift == 32) {                                  \
             value = 0;                                      \
@@ -773,9 +772,6 @@ static void count(uint32_t opcode, int cond_res)
 #define VALUE_LSR_REG_C                                    \
     unsigned int shift = reg[(opcode >> 8) & 15].B.B0;     \
     uint32_t rm = reg[opcode & 0x0F].I;                    \
-    if ((opcode & 0x0F) == 15) {                           \
-        rm += 4;                                           \
-    }                                                      \
     if (LIKELY(shift)) {                                   \
         if (shift == 32) {                                 \
             value = 0;                                     \
@@ -816,9 +812,6 @@ static void count(uint32_t opcode, int cond_res)
 #define VALUE_ASR_REG_C                                         \
     unsigned int shift = reg[(opcode >> 8) & 15].B.B0;          \
     uint32_t rm = reg[opcode & 0x0F].I;                         \
-    if ((opcode & 0x0F) == 15) {                                \
-        rm += 4;                                                \
-    }                                                           \
     if (LIKELY(shift < 32)) {                                   \
         if (LIKELY(shift)) {                                    \
             int32_t v = rm;                                     \
@@ -856,9 +849,6 @@ static void count(uint32_t opcode, int cond_res)
 #define VALUE_ROR_REG_C                                  \
     unsigned int shift = reg[(opcode >> 8) & 15].B.B0;   \
     uint32_t rm = reg[opcode & 0x0F].I;                  \
-    if ((opcode & 0x0F) == 15) {                         \
-        rm += 4;                                         \
-    }                                                    \
     if (LIKELY(shift & 0x1F)) {                          \
         uint32_t v = rm;                                 \
         C_OUT = (v >> (shift - 1)) & 1 ? true : false;   \
@@ -1092,9 +1082,19 @@ static void count(uint32_t opcode, int cond_res)
 // MODECHANGE: MODECHANGE_NO or MODECHANGE_YES
 // ISREGSHIFT: 1 for insns of the form ...,Rn LSL/etc Rs; 0 otherwise
 // ALU_INIT, GETVALUE, OP, and ALU_FINISH are concatenated in order.
+//
+// ARM7TDMI quirk: for data-processing instructions whose shift amount is
+// taken from a register (ISREGSHIFT==1), every read of PC inside the
+// instruction observes PC+12 instead of the usual PC+8 (the extra +4 comes
+// from the additional internal cycle consumed by the register-specified
+// shift). We model that by temporarily bumping reg[15] before GETVALUE/OP
+// and unbumping after, unless Rd is PC (in which case OP already wrote the
+// intended PC value into reg[15] and the dest==PC branch below re-syncs).
 #define ALU_INSN(ALU_INIT, GETVALUE, OP, MODECHANGE, ISREGSHIFT) \
+    if (ISREGSHIFT) reg[15].I += 4;                              \
     ALU_INIT GETVALUE OP ALU_FINISH;                             \
     if (LIKELY((opcode & 0x0000F000) != 0x0000F000)) {           \
+        if (ISREGSHIFT) reg[15].I -= 4;                          \
         clockTicks = 1 + ISREGSHIFT                              \
             + codeTicksAccessSeq32(armNextPC);                   \
     } else {                                                     \
@@ -1213,6 +1213,14 @@ DEFINE_ALU_INSN_NC(1E, 3E, MVN, NO)
 DEFINE_ALU_INSN_C(1F, 3F, MVNS, YES)
 
 // Multiply instructions //////////////////////////////////////////////////
+
+// NOTE: The ARM7TDMI publishes a deterministic (but not spec-documented)
+// C flag after MUL/MLA/MULL — it is the carry-out of the final Booth
+// adder step. Modelling it accurately requires a cycle-accurate Booth
+// + carry-save-adder simulation; a naive Booth-only model produces worse
+// results than leaving C alone, so the fast-path below simply leaves C
+// unchanged. mGBA's accuracy tests flag this as ~20 UMULLS/SMULLS
+// failures; fixing them requires a hardware-calibrated model.
 
 // OP: OP_MUL, OP_MLA etc.
 // SETCOND: SETCOND_NONE, SETCOND_MUL, or SETCOND_MULL

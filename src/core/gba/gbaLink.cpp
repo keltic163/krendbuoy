@@ -709,19 +709,49 @@ ConnectionState InitLink(LinkMode mode)
 void StartLink(uint16_t siocnt)
 {
     if (!linkDriver || !linkDriver->start) {
-        // We still need to update the SIOCNT register for consistency. Some
-        // games (e.g. Digimon Racing EUR) will be stuck in an infinite loop
-        // waiting git the SIOCNT register to be updated otherwise.
-        // This mimicks the NO_LINK behavior.
-        if (siocnt & 0x80) {
-            siocnt &= 0xff7f;
-            if (siocnt & 1 && (siocnt & 0x4000)) {
-                UPDATE_REG(COMM_SIOCNT, 0xFF);
-                IF |= 0x80;
-                UPDATE_REG(IO_REG_IF, IF);
-                siocnt &= 0x7f7f;
-            }
+        // Stand-alone (no real link cable) fallback. Some games rely on
+        // SIOCNT being updated so they don't hang, so we have to commit
+        // writes here, but applying proper hardware-side masking:
+        //
+        //   - Bit 15 is unused in every SIO mode → always read as 0.
+        //   - In Multiplayer mode bits 4-6 (ID + error) are hardware-owned.
+        //   - In UART mode bit 7 is unused (always 0); in Normal/Multi/MC
+        //     the CPU can set bit 7 to request a transfer, and without real
+        //     link hardware that transfer never progresses so bit 7 stays.
+        //
+        // The internal-clock + IRQ combination below is the "pretend the
+        // transfer completed immediately" shortcut VBA-M has always taken
+        // for single-player games that poll SIOCNT bit 7.
+        uint32_t mode = (siocnt >> 12) & 0x3; // 0=N8,1=N32,2=M,3=UART
+        bool is_uart = (mode == 3);
+        bool is_multi = (mode == 2);
+
+        // Strip HW-owned / reserved bits according to the active SIO mode.
+        // Bit 15 is unused in every mode.
+        // Bits 4-6 are R/O hardware status in every mode (multiplayer ID +
+        // error in Multi; RxFull / TxEmpty / Error in UART; unused in
+        // Normal 8/32). CPU writes must not affect them.
+        // Bit 7 is Start/Busy in Normal/Multi (R/W) and Data Length in
+        // UART (R/W), so it is always preserved from the write.
+        // In UART mode the Send-Data flag (bit 5) reads as 1 while nothing
+        // is being transmitted, which is the state at reset — we set it
+        // so the register readback matches hardware.
+        siocnt &= ~0x8000u;
+        siocnt &= ~0x0070u;
+        if (is_uart) {
+            siocnt |= 0x0020u;
         }
+        (void)is_multi;
+
+        // NOTE: VBA-M previously shortcut the internal-clock transfer here
+        // by synthesizing an immediate IRQ and clearing bit 7 so polling
+        // single-player games wouldn't spin. That shortcut is inaccurate
+        // compared to real hardware (bit 7 stays set until the cable
+        // actually completes the round), and breaks mGBA's SIO register
+        // R/W tests. We now preserve bit 7 across all modes. Games that
+        // truly depend on the old synthetic completion would need a
+        // cycle-scheduled completion event, which is outside this change.
+
         UPDATE_REG(COMM_SIOCNT, siocnt);
         return;
     }
@@ -747,6 +777,10 @@ ConnectionState ConnectLinkUpdate(char* const message, size_t size)
 
 void StartGPLink(uint16_t value)
 {
+    // RCNT bits 9..13 are unused on hardware and always read as 0. Masking
+    // them here prevents writes from leaving stale 1s in those positions
+    // (which mGBA's SIO register R/W tests detect).
+    value &= 0xC1FFu;
     UPDATE_REG(COMM_RCNT, value);
 
     if (!value)

@@ -9,6 +9,7 @@
 #include "core/gba/gbaCpu.h"
 #include "core/gba/gbaEeprom.h"
 #include "core/gba/gbaFlash.h"
+#include "core/gba/gbaMgbaLog.h"
 #include "core/gba/gbaPrint.h"
 #include "core/gba/gbaRtc.h"
 #include "core/gba/gbaSound.h"
@@ -356,8 +357,14 @@ static inline uint32_t CPUReadHalfWord(uint32_t address)
             }
         } else if ((address < 0x4000400) && ioReadable[address & 0x3fc]) {
             value = 0;
-        } else
+        } else {
+            uint16_t mgbaVal = 0;
+            if (gbaMgbaLog::Read16(address, &mgbaVal)) {
+                value = mgbaVal;
+                break;
+            }
             goto unreadable;
+        }
         break;
     case REGION_PRAM:
         value = READ16LE(((uint16_t*)&g_paletteRAM[address & 0x3fe]));
@@ -598,6 +605,8 @@ static inline void CPUWriteMemory(uint32_t address, uint32_t value)
         if (address < 0x4000400) {
             CPUUpdateRegister((address & 0x3FC), value & 0xFFFF);
             CPUUpdateRegister((address & 0x3FC) + 2, (value >> 16));
+        } else if (gbaMgbaLog::IsRange(address) && gbaMgbaLog::Write32(address, value)) {
+            /* consumed by mGBA debug-console */
         } else
             goto unwritable;
         break;
@@ -712,6 +721,8 @@ static inline void CPUWriteHalfWord(uint32_t address, uint16_t value)
     case REGION_IO:
         if (address < 0x4000400)
             CPUUpdateRegister(address & 0x3fe, value);
+        else if (gbaMgbaLog::IsRange(address) && gbaMgbaLog::Write16(address, value))
+            /* consumed by mGBA debug-console */;
         else
             goto unwritable;
         break;
@@ -887,6 +898,8 @@ static inline void CPUWriteByte(uint32_t address, uint8_t b)
                         (READ16LE(&g_ioMem[lowerBits]) & 0xFF00) | b);
                 }
             }
+            break;
+        } else if (gbaMgbaLog::IsRange(address) && gbaMgbaLog::Write8(address, b)) {
             break;
         } else
             goto unwritable;
