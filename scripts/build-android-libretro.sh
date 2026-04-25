@@ -55,11 +55,6 @@ if [[ -z "$NDK" ]]; then
   exit 1
 fi
 
-if [[ ! -d "$NDK/toolchains/llvm/prebuilt" ]]; then
-  echo "error: '$NDK' does not look like a valid Android NDK path." >&2
-  exit 1
-fi
-
 HOST_TAG=""
 case "$(uname -s)" in
   Linux)  HOST_TAG="linux-x86_64" ;;
@@ -78,28 +73,24 @@ fi
 
 case "$ABI" in
   arm64-v8a)
-    TARGET_TRIPLE="aarch64-linux-android"
     CLANG_TRIPLE="aarch64-linux-android"
     MAKE_PLATFORM="unix"
-    EXTRA_CFLAGS="-DANDROID -D__ANDROID_API__=$ANDROID_API"
+    ABI_CFLAGS="-DANDROID"
     ;;
   armeabi-v7a)
-    TARGET_TRIPLE="armv7a-linux-androideabi"
     CLANG_TRIPLE="armv7a-linux-androideabi"
     MAKE_PLATFORM="armv7-neon-softfloat"
-    EXTRA_CFLAGS="-DANDROID -D__ANDROID_API__=$ANDROID_API"
+    ABI_CFLAGS="-DANDROID"
     ;;
   x86_64)
-    TARGET_TRIPLE="x86_64-linux-android"
     CLANG_TRIPLE="x86_64-linux-android"
     MAKE_PLATFORM="unix"
-    EXTRA_CFLAGS="-DANDROID -D__ANDROID_API__=$ANDROID_API"
+    ABI_CFLAGS="-DANDROID"
     ;;
   x86)
-    TARGET_TRIPLE="i686-linux-android"
     CLANG_TRIPLE="i686-linux-android"
     MAKE_PLATFORM="unix"
-    EXTRA_CFLAGS="-DANDROID -D__ANDROID_API__=$ANDROID_API"
+    ABI_CFLAGS="-DANDROID"
     ;;
   *)
     echo "error: unsupported ABI '$ABI'" >&2
@@ -133,9 +124,9 @@ make -C "$LIBRETRO_DIR" \
   CC="$CC_BIN" \
   CXX="$CXX_BIN" \
   AR="$AR_BIN" \
-  CFLAGS="$EXTRA_CFLAGS" \
-  CXXFLAGS="$EXTRA_CFLAGS -std=gnu++17" \
-  LDFLAGS="-target ${TARGET_TRIPLE}${ANDROID_API}" \
+  CFLAGS+="$ABI_CFLAGS" \
+  CXXFLAGS+="$ABI_CFLAGS -std=gnu++17 -fpermissive" \
+  LDFLAGS+="-fPIC" \
   -j"$JOBS"
 
 if [[ ! -f "$LIBRETRO_DIR/vbam_libretro.so" ]]; then
