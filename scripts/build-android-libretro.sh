@@ -75,22 +75,18 @@ case "$ABI" in
   arm64-v8a)
     CLANG_TRIPLE="aarch64-linux-android"
     MAKE_PLATFORM="unix"
-    ABI_CFLAGS="-DANDROID"
     ;;
   armeabi-v7a)
     CLANG_TRIPLE="armv7a-linux-androideabi"
     MAKE_PLATFORM="armv7-neon-softfloat"
-    ABI_CFLAGS="-DANDROID"
     ;;
   x86_64)
     CLANG_TRIPLE="x86_64-linux-android"
     MAKE_PLATFORM="unix"
-    ABI_CFLAGS="-DANDROID"
     ;;
   x86)
     CLANG_TRIPLE="i686-linux-android"
     MAKE_PLATFORM="unix"
-    ABI_CFLAGS="-DANDROID"
     ;;
   *)
     echo "error: unsupported ABI '$ABI'" >&2
@@ -118,15 +114,17 @@ printf '  API: %s\n' "$ANDROID_API"
 printf '  NDK: %s\n' "$NDK"
 printf '  Output: %s\n' "$OUT_DIR/vbam_libretro.so"
 
+COMMON_FLAGS="-DANDROID -D__LIBRETRO__"
+
 make -C "$LIBRETRO_DIR" clean >/dev/null 2>&1 || true
 make -C "$LIBRETRO_DIR" \
   platform="$MAKE_PLATFORM" \
   CC="$CC_BIN" \
   CXX="$CXX_BIN" \
   AR="$AR_BIN" \
-  CFLAGS+="$ABI_CFLAGS" \
-  CXXFLAGS+="$ABI_CFLAGS -std=gnu++17 -fpermissive" \
-  LDFLAGS+="-fPIC" \
+  CFLAGS="$COMMON_FLAGS" \
+  CXXFLAGS="$COMMON_FLAGS -std=gnu++17" \
+  LDFLAGS="-fPIC" \
   -j"$JOBS"
 
 if [[ ! -f "$LIBRETRO_DIR/vbam_libretro.so" ]]; then
