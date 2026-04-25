@@ -114,7 +114,7 @@ printf '  API: %s\n' "$ANDROID_API"
 printf '  NDK: %s\n' "$NDK"
 printf '  Output: %s\n' "$OUT_DIR/vbam_libretro.so"
 
-COMMON_FLAGS="-DANDROID -D__LIBRETRO__"
+COMMON_FLAGS="-DANDROID -D__LIBRETRO__ -DC_CORE"
 
 make -C "$LIBRETRO_DIR" clean >/dev/null 2>&1 || true
 make -C "$LIBRETRO_DIR" \
