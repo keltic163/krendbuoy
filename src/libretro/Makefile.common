@@ -27,7 +27,8 @@ SOURCES_CXX :=
 
 SOURCES_CXX += \
 	$(CORE_DIR)/libretro/libretro.cpp \
-	$(CORE_DIR)/libretro/SoundRetro.cpp
+	$(CORE_DIR)/libretro/SoundRetro.cpp \
+	$(CORE_DIR)/libretro/link_stub.cpp
 
 SOURCES_CXX += \
 	$(CORE_DIR)/core/base/internal/file_util_internal.cpp \
