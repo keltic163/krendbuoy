@@ -12,6 +12,10 @@ target_include_directories(vbam_frontend PRIVATE
 
 find_library(log-lib log)
 
+target_link_options(vbam_frontend PRIVATE
+    -Wl,--allow-shlib-undefined
+)
+
 target_link_libraries(vbam_frontend
     ${log-lib}
 )
