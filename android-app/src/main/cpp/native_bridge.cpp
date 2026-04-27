@@ -95,9 +95,7 @@ static uint32_t rgb565ToArgb(uint16_t p) {
     return 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
 }
 
-static uint32_t xrgb8888ToArgb(uint32_t p) {
-    return 0xFF000000u | (p & 0x00FFFFFFu);
-}
+static uint32_t xrgb8888ToArgb(uint32_t p) { return 0xFF000000u | (p & 0x00FFFFFFu); }
 
 static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!data || !w || !h) return;
@@ -119,6 +117,7 @@ static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
         for (unsigned y = 0; y < h; y++) for (unsigned x = 0; x < w; x++) framePixels[y * w + x] = rgb565ToArgb(src[y * srcStride + x]);
     }
 }
+
 static void audioCb(int16_t, int16_t) {}
 static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
 static void inputPollCb() {}
@@ -245,6 +244,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setButtonSta
     unsigned current = inputMask.load();
     while (!inputMask.compare_exchange_weak(current, down ? (current | bit) : (current & ~bit))) {}
 }
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getInputMask(JNIEnv*, jclass) { return static_cast<jint>(inputMask.load()); }
 extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) { return env->NewStringUTF(last.c_str()); }
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
     clearButtons(); if (loaded && p_retro_unload_game) p_retro_unload_game();
