@@ -63,7 +63,15 @@ public class GameActivity extends Activity {
             NativeBridge.setDirectories(systemDir.getAbsolutePath(), saveDir.getAbsolutePath());
 
             boolean loaded = NativeBridge.loadRom(localRom.getAbsolutePath());
-            String diagnostic = NativeBridge.getLastError();
+            String loadDiagnostic = NativeBridge.getLastError();
+
+            boolean frameRan = false;
+            String frameDiagnostic = "Not run because ROM failed to load.";
+            if (loaded) {
+                frameRan = NativeBridge.runFrame();
+                frameDiagnostic = NativeBridge.getLastError();
+            }
+
             String message = "ROM copied to local storage:\n" +
                     localRom.getAbsolutePath() +
                     "\n\nSystem directory:\n" +
@@ -72,13 +80,21 @@ public class GameActivity extends Activity {
                     saveDir.getAbsolutePath() +
                     "\n\nNativeBridge.loadRom(): " +
                     (loaded ? "success" : "failed") +
-                    "\n\nNative diagnostic:\n" +
-                    (diagnostic == null || diagnostic.isEmpty() ? "No native diagnostic reported." : diagnostic) +
-                    "\n\nNext step:\nconnect this native load to video rendering.";
+                    "\n\nLoad diagnostic:\n" +
+                    safeDiagnostic(loadDiagnostic) +
+                    "\n\nNativeBridge.runFrame(): " +
+                    (frameRan ? "success" : "failed") +
+                    "\n\nFrame diagnostic:\n" +
+                    safeDiagnostic(frameDiagnostic) +
+                    "\n\nNext step:\nrender the produced frame to a SurfaceView.";
             updateInfo(message);
         } catch (Throwable t) {
             updateInfo("ROM prepare/load failed:\n" + t.getMessage());
         }
+    }
+
+    private String safeDiagnostic(String value) {
+        return value == null || value.isEmpty() ? "No native diagnostic reported." : value;
     }
 
     private File ensureDirectory(String name) throws Exception {
