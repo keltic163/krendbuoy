@@ -1,12 +1,14 @@
 package com.keltic.vbam;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.database.Cursor;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -16,6 +18,9 @@ import java.io.InputStream;
 
 public class GameActivity extends Activity {
     private TextView info;
+    private ImageView screen;
+    private volatile boolean running;
+    private Thread frameThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,31 +31,38 @@ public class GameActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
-        root.setPadding(48, 48, 48, 48);
+        root.setPadding(24, 24, 24, 24);
 
-        TextView title = new TextView(this);
-        title.setText("VBA-M Android Runtime");
-        title.setTextSize(26f);
-        title.setGravity(Gravity.CENTER);
-        root.addView(title);
+        screen = new ImageView(this);
+        screen.setAdjustViewBounds(true);
+        screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        root.addView(screen, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+        ));
 
         info = new TextView(this);
         info.setText("Preparing ROM...");
-        info.setTextSize(16f);
+        info.setTextSize(13f);
         info.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+        root.addView(info, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(0, 32, 0, 0);
-        root.addView(info, params);
+        ));
 
         setContentView(root);
-
-        new Thread(() -> prepareAndLoadRom(romUri)).start();
+        new Thread(() -> prepareAndStart(romUri)).start();
     }
 
-    private void prepareAndLoadRom(Uri romUri) {
+    @Override
+    protected void onDestroy() {
+        running = false;
+        NativeBridge.unloadRom();
+        super.onDestroy();
+    }
+
+    private void prepareAndStart(Uri romUri) {
         if (romUri == null) {
             updateInfo("No ROM URI received.");
             return;
@@ -63,38 +75,58 @@ public class GameActivity extends Activity {
             NativeBridge.setDirectories(systemDir.getAbsolutePath(), saveDir.getAbsolutePath());
 
             boolean loaded = NativeBridge.loadRom(localRom.getAbsolutePath());
-            String loadDiagnostic = NativeBridge.getLastError();
-
-            boolean frameRan = false;
-            String frameDiagnostic = "Not run because ROM failed to load.";
-            if (loaded) {
-                frameRan = NativeBridge.runFrame();
-                frameDiagnostic = NativeBridge.getLastError();
+            if (!loaded) {
+                updateInfo("loadRom failed:\n" + NativeBridge.getLastError());
+                return;
             }
 
-            String message = "ROM copied to local storage:\n" +
-                    localRom.getAbsolutePath() +
-                    "\n\nSystem directory:\n" +
-                    systemDir.getAbsolutePath() +
-                    "\n\nSave directory:\n" +
-                    saveDir.getAbsolutePath() +
-                    "\n\nNativeBridge.loadRom(): " +
-                    (loaded ? "success" : "failed") +
-                    "\n\nLoad diagnostic:\n" +
-                    safeDiagnostic(loadDiagnostic) +
-                    "\n\nNativeBridge.runFrame(): " +
-                    (frameRan ? "success" : "failed") +
-                    "\n\nFrame diagnostic:\n" +
-                    safeDiagnostic(frameDiagnostic) +
-                    "\n\nNext step:\nrender the produced frame to a SurfaceView.";
-            updateInfo(message);
+            updateInfo("Running...\n" + NativeBridge.getLastError());
+            startFrameLoop();
         } catch (Throwable t) {
             updateInfo("ROM prepare/load failed:\n" + t.getMessage());
         }
     }
 
-    private String safeDiagnostic(String value) {
-        return value == null || value.isEmpty() ? "No native diagnostic reported." : value;
+    private void startFrameLoop() {
+        if (running) {
+            return;
+        }
+        running = true;
+        frameThread = new Thread(() -> {
+            long frame = 0;
+            while (running) {
+                long start = System.currentTimeMillis();
+                boolean ok = NativeBridge.runFrame();
+                if (ok) {
+                    int width = NativeBridge.getFrameWidth();
+                    int height = NativeBridge.getFrameHeight();
+                    int[] pixels = NativeBridge.copyFramePixels();
+                    if (width > 0 && height > 0 && pixels != null && pixels.length == width * height) {
+                        Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
+                        runOnUiThread(() -> screen.setImageBitmap(bitmap));
+                    }
+                    frame++;
+                    if (frame % 30 == 0) {
+                        updateInfo(NativeBridge.getLastError());
+                    }
+                } else {
+                    updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
+                    running = false;
+                }
+
+                long elapsed = System.currentTimeMillis() - start;
+                long sleep = 16L - elapsed;
+                if (sleep > 0) {
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        running = false;
+                    }
+                }
+            }
+        }, "VBAM-frame-loop");
+        frameThread.start();
     }
 
     private File ensureDirectory(String name) throws Exception {
@@ -107,12 +139,10 @@ public class GameActivity extends Activity {
 
     private File copyRomToLocalFile(Uri romUri) throws Exception {
         File dir = ensureDirectory("roms");
-
         String name = sanitizeFileName(getDisplayName(romUri));
         if (name.isEmpty()) {
             name = "selected.rom";
         }
-
         File outFile = new File(dir, name);
         try (InputStream input = getContentResolver().openInputStream(romUri);
              FileOutputStream output = new FileOutputStream(outFile)) {
