@@ -31,8 +31,8 @@ static std::mutex frameMutex;
 static std::vector<uint32_t> framePixels;
 static int frameWidth = 0;
 static int frameHeight = 0;
-
 static std::atomic_bool buttonStates[10];
+static std::atomic_uint inputMask{0};
 
 static constexpr int BTN_A = 0;
 static constexpr int BTN_B = 1;
@@ -101,46 +101,32 @@ static uint32_t xrgb8888ToArgb(uint32_t p) {
 
 static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!data || !w || !h) return;
-
     videoFrames++;
     lastW = w;
     lastH = h;
     lastPitch = pitch;
-
     std::lock_guard<std::mutex> lock(frameMutex);
     frameWidth = static_cast<int>(w);
     frameHeight = static_cast<int>(h);
     framePixels.resize(static_cast<size_t>(w) * static_cast<size_t>(h));
-
     if (pitch >= w * 4) {
         const uint32_t* src = static_cast<const uint32_t*>(data);
         size_t srcStride = pitch / sizeof(uint32_t);
-        for (unsigned y = 0; y < h; y++) {
-            for (unsigned x = 0; x < w; x++) {
-                framePixels[y * w + x] = xrgb8888ToArgb(src[y * srcStride + x]);
-            }
-        }
+        for (unsigned y = 0; y < h; y++) for (unsigned x = 0; x < w; x++) framePixels[y * w + x] = xrgb8888ToArgb(src[y * srcStride + x]);
     } else {
         const uint16_t* src = static_cast<const uint16_t*>(data);
         size_t srcStride = pitch / sizeof(uint16_t);
-        for (unsigned y = 0; y < h; y++) {
-            for (unsigned x = 0; x < w; x++) {
-                framePixels[y * w + x] = rgb565ToArgb(src[y * srcStride + x]);
-            }
-        }
+        for (unsigned y = 0; y < h; y++) for (unsigned x = 0; x < w; x++) framePixels[y * w + x] = rgb565ToArgb(src[y * srcStride + x]);
     }
 }
 static void audioCb(int16_t, int16_t) {}
 static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
 static void inputPollCb() {}
 static int16_t inputStateCb(unsigned port, unsigned device, unsigned, unsigned id) {
-    if (port != 0 || device != RETRO_DEVICE_JOYPAD) {
-        return 0;
-    }
-
+    if (port != 0 || device != RETRO_DEVICE_JOYPAD) return 0;
     switch (id) {
-        case RETRO_DEVICE_ID_JOYPAD_A: return buttonStates[BTN_A].load() ? 1 : 0;
-        case RETRO_DEVICE_ID_JOYPAD_B: return buttonStates[BTN_B].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_A: return buttonStates[BTN_B].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_B: return buttonStates[BTN_A].load() ? 1 : 0;
         case RETRO_DEVICE_ID_JOYPAD_SELECT: return buttonStates[BTN_SELECT].load() ? 1 : 0;
         case RETRO_DEVICE_ID_JOYPAD_START: return buttonStates[BTN_START].load() ? 1 : 0;
         case RETRO_DEVICE_ID_JOYPAD_UP: return buttonStates[BTN_UP].load() ? 1 : 0;
@@ -154,9 +140,8 @@ static int16_t inputStateCb(unsigned port, unsigned device, unsigned, unsigned i
 }
 
 static void clearButtons() {
-    for (auto& buttonState : buttonStates) {
-        buttonState.store(false);
-    }
+    for (auto& buttonState : buttonStates) buttonState.store(false);
+    inputMask.store(0);
 }
 
 static bool envCb(unsigned cmd, void* data) {
@@ -212,84 +197,56 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getCoreNa
     if (!initCore()) return env->NewStringUTF("VBA-M core unavailable");
     return env->NewStringUTF(sysInfo.library_name ? sysInfo.library_name : "VBA-M");
 }
-
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setDirectories(JNIEnv* env, jclass, jstring systemDirectory, jstring saveDirectory) {
     const char* s = systemDirectory ? env->GetStringUTFChars(systemDirectory, nullptr) : nullptr;
     const char* v = saveDirectory ? env->GetStringUTFChars(saveDirectory, nullptr) : nullptr;
-    systemDir = s ? s : "";
-    saveDir = v ? v : "";
+    systemDir = s ? s : ""; saveDir = v ? v : "";
     if (s) env->ReleaseStringUTFChars(systemDirectory, s);
     if (v) env->ReleaseStringUTFChars(saveDirectory, v);
     last = "Directories set.";
 }
-
 extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
     const char* raw = path ? env->GetStringUTFChars(path, nullptr) : nullptr;
     if (!raw || raw[0] == 0) { if (raw) env->ReleaseStringUTFChars(path, raw); fail("loadRom failed: empty path"); return JNI_FALSE; }
-    std::string localPath(raw);
-    env->ReleaseStringUTFChars(path, raw);
+    std::string localPath(raw); env->ReleaseStringUTFChars(path, raw);
     if (systemDir.empty() || saveDir.empty()) { fail("loadRom failed: directories not set"); return JNI_FALSE; }
     if (!initCore()) return JNI_FALSE;
     if (loaded) { p_retro_unload_game(); loaded = false; }
-    frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0;
-    clearButtons();
-    {
-        std::lock_guard<std::mutex> lock(frameMutex);
-        framePixels.clear();
-        frameWidth = 0;
-        frameHeight = 0;
-    }
+    frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0; clearButtons();
+    { std::lock_guard<std::mutex> lock(frameMutex); framePixels.clear(); frameWidth = 0; frameHeight = 0; }
     retro_game_info game = {}; game.path = localPath.c_str();
     bool ok = p_retro_load_game(&game);
     if (!ok && readFile(localPath, romData)) { game.data = romData.data(); game.size = romData.size(); ok = p_retro_load_game(&game); }
     if (!ok) { fail("retro_load_game failed. path=" + localPath); return JNI_FALSE; }
-    loaded = true;
-    p_retro_get_system_av_info(&avInfo);
+    loaded = true; p_retro_get_system_av_info(&avInfo);
     last = "retro_load_game success. geometry=" + std::to_string(avInfo.geometry.base_width) + "x" + std::to_string(avInfo.geometry.base_height) + ". romBytes=" + std::to_string(romData.size());
     return JNI_TRUE;
 }
-
 extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_runFrame(JNIEnv*, jclass) {
     if (!loaded || !p_retro_run) { fail("runFrame failed: game not loaded"); return JNI_FALSE; }
-    p_retro_run();
-    frames++;
-    last = "retro_run success. frames=" + std::to_string(frames) + ". videoCallbacks=" + std::to_string(videoFrames) + ". lastVideo=" + std::to_string(lastW) + "x" + std::to_string(lastH) + ". pitch=" + std::to_string(lastPitch);
+    p_retro_run(); frames++;
+    last = "retro_run success. frames=" + std::to_string(frames) + ". videoCallbacks=" + std::to_string(videoFrames) + ". lastVideo=" + std::to_string(lastW) + "x" + std::to_string(lastH) + ". pitch=" + std::to_string(lastPitch) + ". inputMask=" + std::to_string(inputMask.load());
     return JNI_TRUE;
 }
-
-extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameWidth(JNIEnv*, jclass) {
-    std::lock_guard<std::mutex> lock(frameMutex);
-    return frameWidth;
-}
-
-extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameHeight(JNIEnv*, jclass) {
-    std::lock_guard<std::mutex> lock(frameMutex);
-    return frameHeight;
-}
-
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameWidth(JNIEnv*, jclass) { std::lock_guard<std::mutex> lock(frameMutex); return frameWidth; }
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameHeight(JNIEnv*, jclass) { std::lock_guard<std::mutex> lock(frameMutex); return frameHeight; }
 extern "C" JNIEXPORT jintArray JNICALL Java_com_keltic_vbam_NativeBridge_copyFramePixels(JNIEnv* env, jclass) {
     std::lock_guard<std::mutex> lock(frameMutex);
-    if (framePixels.empty()) {
-        return env->NewIntArray(0);
-    }
+    if (framePixels.empty()) return env->NewIntArray(0);
     jintArray result = env->NewIntArray(static_cast<jsize>(framePixels.size()));
     env->SetIntArrayRegion(result, 0, static_cast<jsize>(framePixels.size()), reinterpret_cast<const jint*>(framePixels.data()));
     return result;
 }
-
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setButtonState(JNIEnv*, jclass, jint button, jboolean pressed) {
-    if (button < 0 || button >= 10) {
-        return;
-    }
-    buttonStates[button].store(pressed == JNI_TRUE);
+    if (button < 0 || button >= 10) return;
+    bool down = pressed == JNI_TRUE;
+    buttonStates[button].store(down);
+    unsigned bit = 1u << static_cast<unsigned>(button);
+    unsigned current = inputMask.load();
+    while (!inputMask.compare_exchange_weak(current, down ? (current | bit) : (current & ~bit))) {}
 }
-
-extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
-    return env->NewStringUTF(last.c_str());
-}
-
+extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) { return env->NewStringUTF(last.c_str()); }
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
-    clearButtons();
-    if (loaded && p_retro_unload_game) p_retro_unload_game();
+    clearButtons(); if (loaded && p_retro_unload_game) p_retro_unload_game();
     loaded = false; romData.clear(); last = "ROM unloaded.";
 }
