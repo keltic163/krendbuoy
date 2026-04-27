@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <cstdint>
 #include <fstream>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "libretro.h"
@@ -25,6 +26,10 @@ static uint64_t videoFrames = 0;
 static unsigned lastW = 0;
 static unsigned lastH = 0;
 static size_t lastPitch = 0;
+static std::mutex frameMutex;
+static std::vector<uint32_t> framePixels;
+static int frameWidth = 0;
+static int frameHeight = 0;
 
 #define LOADSYM(name) do { p_##name = reinterpret_cast<name##_t>(dlsym(core, #name)); if (!p_##name) { fail(std::string("Missing symbol: ") + #name); return false; } } while (0)
 
@@ -70,7 +75,29 @@ static bool readFile(const std::string& path, std::vector<uint8_t>& out) {
 }
 
 static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
-    if (data && w && h) { videoFrames++; lastW = w; lastH = h; lastPitch = pitch; }
+    if (!data || !w || !h) return;
+
+    videoFrames++;
+    lastW = w;
+    lastH = h;
+    lastPitch = pitch;
+
+    std::lock_guard<std::mutex> lock(frameMutex);
+    frameWidth = static_cast<int>(w);
+    frameHeight = static_cast<int>(h);
+    framePixels.resize(static_cast<size_t>(w) * static_cast<size_t>(h));
+
+    const uint16_t* src = static_cast<const uint16_t*>(data);
+    size_t srcStride = pitch / sizeof(uint16_t);
+    for (unsigned y = 0; y < h; y++) {
+        for (unsigned x = 0; x < w; x++) {
+            uint16_t p = src[y * srcStride + x];
+            uint8_t r = static_cast<uint8_t>(((p >> 11) & 0x1F) * 255 / 31);
+            uint8_t g = static_cast<uint8_t>(((p >> 5) & 0x3F) * 255 / 63);
+            uint8_t b = static_cast<uint8_t>((p & 0x1F) * 255 / 31);
+            framePixels[y * w + x] = 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+        }
+    }
 }
 static void audioCb(int16_t, int16_t) {}
 static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
@@ -89,6 +116,7 @@ static bool envCb(unsigned cmd, void* data) {
             if (data) { *static_cast<bool*>(data) = true; return true; }
             return false;
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
+            return true;
         case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
         case RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS:
@@ -149,6 +177,12 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_loadRom(
     if (!initCore()) return JNI_FALSE;
     if (loaded) { p_retro_unload_game(); loaded = false; }
     frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0;
+    {
+        std::lock_guard<std::mutex> lock(frameMutex);
+        framePixels.clear();
+        frameWidth = 0;
+        frameHeight = 0;
+    }
     retro_game_info game = {}; game.path = localPath.c_str();
     bool ok = p_retro_load_game(&game);
     if (!ok && readFile(localPath, romData)) { game.data = romData.data(); game.size = romData.size(); ok = p_retro_load_game(&game); }
@@ -165,6 +199,26 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_runFrame
     frames++;
     last = "retro_run success. frames=" + std::to_string(frames) + ". videoCallbacks=" + std::to_string(videoFrames) + ". lastVideo=" + std::to_string(lastW) + "x" + std::to_string(lastH) + ". pitch=" + std::to_string(lastPitch);
     return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameWidth(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(frameMutex);
+    return frameWidth;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameHeight(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(frameMutex);
+    return frameHeight;
+}
+
+extern "C" JNIEXPORT jintArray JNICALL Java_com_keltic_vbam_NativeBridge_copyFramePixels(JNIEnv* env, jclass) {
+    std::lock_guard<std::mutex> lock(frameMutex);
+    if (framePixels.empty()) {
+        return env->NewIntArray(0);
+    }
+    jintArray result = env->NewIntArray(static_cast<jsize>(framePixels.size()));
+    env->SetIntArrayRegion(result, 0, static_cast<jsize>(framePixels.size()), reinterpret_cast<const jint*>(framePixels.data()));
+    return result;
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
