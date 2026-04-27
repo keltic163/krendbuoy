@@ -16,6 +16,9 @@ static void* g_coreHandle = nullptr;
 static bool g_coreInitialized = false;
 static bool g_gameLoaded = false;
 static std::string g_loadedPath;
+static std::string g_systemDirectory;
+static std::string g_saveDirectory;
+static std::string g_lastError = "No operation yet.";
 static retro_system_info g_systemInfo = {};
 static retro_system_av_info g_avInfo = {};
 
@@ -46,6 +49,11 @@ static retro_load_game_t p_retro_load_game = nullptr;
 static retro_unload_game_t p_retro_unload_game = nullptr;
 static retro_get_system_info_t p_retro_get_system_info = nullptr;
 static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;
+
+static void set_last_error(const std::string& message) {
+    g_lastError = message;
+    LOGE("%s", message.c_str());
+}
 
 static void frontend_video_refresh(const void*, unsigned width, unsigned height, size_t pitch) {
     (void)width;
@@ -86,9 +94,15 @@ static bool frontend_environment(unsigned cmd, void* data) {
             return false;
 
         case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+            if (data && !g_systemDirectory.empty()) {
+                *static_cast<const char**>(data) = g_systemDirectory.c_str();
+                return true;
+            }
+            return false;
+
         case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
-            if (data) {
-                *static_cast<const char**>(data) = nullptr;
+            if (data && !g_saveDirectory.empty()) {
+                *static_cast<const char**>(data) = g_saveDirectory.c_str();
                 return true;
             }
             return false;
@@ -106,7 +120,7 @@ template <typename T>
 static bool load_symbol(T* out, const char* name) {
     *out = reinterpret_cast<T>(dlsym(g_coreHandle, name));
     if (*out == nullptr) {
-        LOGE("Missing libretro symbol: %s", name);
+        set_last_error(std::string("Missing libretro symbol: ") + name);
         return false;
     }
     return true;
@@ -116,24 +130,29 @@ static bool ensure_core_symbols_loaded() {
     if (g_coreHandle == nullptr) {
         g_coreHandle = dlopen("libvbam_libretro.so", RTLD_NOW | RTLD_GLOBAL);
         if (g_coreHandle == nullptr) {
-            LOGE("dlopen libvbam_libretro.so failed: %s", dlerror());
+            const char* error = dlerror();
+            set_last_error(std::string("dlopen libvbam_libretro.so failed: ") + (error ? error : "unknown error"));
             return false;
         }
     }
 
-    return load_symbol(&p_retro_init, "retro_init") &&
-           load_symbol(&p_retro_deinit, "retro_deinit") &&
-           load_symbol(&p_retro_api_version, "retro_api_version") &&
-           load_symbol(&p_retro_set_environment, "retro_set_environment") &&
-           load_symbol(&p_retro_set_video_refresh, "retro_set_video_refresh") &&
-           load_symbol(&p_retro_set_audio_sample, "retro_set_audio_sample") &&
-           load_symbol(&p_retro_set_audio_sample_batch, "retro_set_audio_sample_batch") &&
-           load_symbol(&p_retro_set_input_poll, "retro_set_input_poll") &&
-           load_symbol(&p_retro_set_input_state, "retro_set_input_state") &&
-           load_symbol(&p_retro_load_game, "retro_load_game") &&
-           load_symbol(&p_retro_unload_game, "retro_unload_game") &&
-           load_symbol(&p_retro_get_system_info, "retro_get_system_info") &&
-           load_symbol(&p_retro_get_system_av_info, "retro_get_system_av_info");
+    bool ok = load_symbol(&p_retro_init, "retro_init") &&
+              load_symbol(&p_retro_deinit, "retro_deinit") &&
+              load_symbol(&p_retro_api_version, "retro_api_version") &&
+              load_symbol(&p_retro_set_environment, "retro_set_environment") &&
+              load_symbol(&p_retro_set_video_refresh, "retro_set_video_refresh") &&
+              load_symbol(&p_retro_set_audio_sample, "retro_set_audio_sample") &&
+              load_symbol(&p_retro_set_audio_sample_batch, "retro_set_audio_sample_batch") &&
+              load_symbol(&p_retro_set_input_poll, "retro_set_input_poll") &&
+              load_symbol(&p_retro_set_input_state, "retro_set_input_state") &&
+              load_symbol(&p_retro_load_game, "retro_load_game") &&
+              load_symbol(&p_retro_unload_game, "retro_unload_game") &&
+              load_symbol(&p_retro_get_system_info, "retro_get_system_info") &&
+              load_symbol(&p_retro_get_system_av_info, "retro_get_system_av_info");
+    if (ok) {
+        g_lastError = "Core symbols loaded.";
+    }
+    return ok;
 }
 
 static bool ensure_core_initialized() {
@@ -155,7 +174,11 @@ static bool ensure_core_initialized() {
     p_retro_get_system_info(&g_systemInfo);
     g_coreInitialized = true;
 
-    LOGI("Core initialized: %s %s", g_systemInfo.library_name ? g_systemInfo.library_name : "unknown", g_systemInfo.library_version ? g_systemInfo.library_version : "unknown");
+    g_lastError = std::string("Core initialized: ") +
+            (g_systemInfo.library_name ? g_systemInfo.library_name : "unknown") +
+            " " +
+            (g_systemInfo.library_version ? g_systemInfo.library_version : "unknown");
+    LOGI("%s", g_lastError.c_str());
     return true;
 }
 
@@ -173,9 +196,29 @@ Java_com_keltic_vbam_NativeBridge_getCoreName(JNIEnv* env, jclass) {
     return env->NewStringUTF(name.c_str());
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_keltic_vbam_NativeBridge_setDirectories(JNIEnv* env, jclass, jstring systemDirectory, jstring saveDirectory) {
+    const char* systemRaw = systemDirectory ? env->GetStringUTFChars(systemDirectory, nullptr) : nullptr;
+    const char* saveRaw = saveDirectory ? env->GetStringUTFChars(saveDirectory, nullptr) : nullptr;
+
+    g_systemDirectory = systemRaw ? systemRaw : "";
+    g_saveDirectory = saveRaw ? saveRaw : "";
+
+    if (systemRaw) {
+        env->ReleaseStringUTFChars(systemDirectory, systemRaw);
+    }
+    if (saveRaw) {
+        env->ReleaseStringUTFChars(saveDirectory, saveRaw);
+    }
+
+    g_lastError = "Directories set. system=" + g_systemDirectory + " save=" + g_saveDirectory;
+    LOGI("%s", g_lastError.c_str());
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
     if (path == nullptr) {
+        set_last_error("loadRom failed: path was null.");
         return JNI_FALSE;
     }
 
@@ -184,11 +227,17 @@ Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
         if (rawPath != nullptr) {
             env->ReleaseStringUTFChars(path, rawPath);
         }
+        set_last_error("loadRom failed: path was empty.");
         return JNI_FALSE;
     }
 
     std::string localPath(rawPath);
     env->ReleaseStringUTFChars(path, rawPath);
+
+    if (g_systemDirectory.empty() || g_saveDirectory.empty()) {
+        set_last_error("loadRom failed: system/save directories were not set before loading ROM.");
+        return JNI_FALSE;
+    }
 
     if (!ensure_core_initialized()) {
         return JNI_FALSE;
@@ -210,12 +259,26 @@ Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
         g_gameLoaded = true;
         g_loadedPath = localPath;
         p_retro_get_system_av_info(&g_avInfo);
-        LOGI("retro_load_game success: %s (%ux%u)", localPath.c_str(), g_avInfo.geometry.base_width, g_avInfo.geometry.base_height);
+        g_lastError = "retro_load_game success. geometry=" +
+                std::to_string(g_avInfo.geometry.base_width) + "x" +
+                std::to_string(g_avInfo.geometry.base_height);
+        LOGI("%s", g_lastError.c_str());
     } else {
-        LOGE("retro_load_game failed: %s", localPath.c_str());
+        set_last_error("retro_load_game returned false for path: " + localPath +
+                       ". Core=" +
+                       (g_systemInfo.library_name ? g_systemInfo.library_name : "unknown") +
+                       " " +
+                       (g_systemInfo.library_version ? g_systemInfo.library_version : "unknown") +
+                       ". systemDir=" + g_systemDirectory +
+                       ". saveDir=" + g_saveDirectory);
     }
 
     return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
+    return env->NewStringUTF(g_lastError.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -224,5 +287,6 @@ Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
         p_retro_unload_game();
         g_gameLoaded = false;
         g_loadedPath.clear();
+        g_lastError = "ROM unloaded.";
     }
 }
