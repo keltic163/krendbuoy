@@ -15,6 +15,8 @@ public final class NativeBridge {
 
     public static native boolean loadRom(String path);
 
+    public static native boolean runFrame();
+
     public static native String getLastError();
 
     public static native void unloadRom();
