@@ -4,7 +4,9 @@
 
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <string>
+#include <vector>
 
 #include "libretro.h"
 
@@ -21,6 +23,7 @@ static std::string g_saveDirectory;
 static std::string g_lastError = "No operation yet.";
 static retro_system_info g_systemInfo = {};
 static retro_system_av_info g_avInfo = {};
+static std::vector<uint8_t> g_romData;
 
 typedef void (*retro_init_t)(void);
 typedef void (*retro_deinit_t)(void);
@@ -53,6 +56,30 @@ static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;
 static void set_last_error(const std::string& message) {
     g_lastError = message;
     LOGE("%s", message.c_str());
+}
+
+static bool read_file(const std::string& path, std::vector<uint8_t>& out) {
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        set_last_error("memory load failed: could not open ROM file: " + path);
+        return false;
+    }
+
+    std::ifstream::pos_type size = file.tellg();
+    if (size <= 0) {
+        set_last_error("memory load failed: ROM file is empty or unreadable: " + path);
+        return false;
+    }
+
+    out.resize(static_cast<size_t>(size));
+    file.seekg(0, std::ios::beg);
+    if (!file.read(reinterpret_cast<char*>(out.data()), size)) {
+        set_last_error("memory load failed: could not read entire ROM file: " + path);
+        out.clear();
+        return false;
+    }
+
+    return true;
 }
 
 static void frontend_video_refresh(const void*, unsigned width, unsigned height, size_t pitch) {
@@ -248,27 +275,52 @@ Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
         g_gameLoaded = false;
     }
 
-    retro_game_info game = {};
-    game.path = localPath.c_str();
-    game.data = nullptr;
-    game.size = 0;
-    game.meta = nullptr;
+    retro_game_info pathGame = {};
+    pathGame.path = localPath.c_str();
+    pathGame.data = nullptr;
+    pathGame.size = 0;
+    pathGame.meta = nullptr;
 
-    bool ok = p_retro_load_game(&game);
+    bool ok = p_retro_load_game(&pathGame);
+    std::string firstFailure = "path load returned false";
+
+    if (!ok) {
+        g_romData.clear();
+        if (read_file(localPath, g_romData)) {
+            retro_game_info memoryGame = {};
+            memoryGame.path = localPath.c_str();
+            memoryGame.data = g_romData.data();
+            memoryGame.size = g_romData.size();
+            memoryGame.meta = nullptr;
+            ok = p_retro_load_game(&memoryGame);
+            if (!ok) {
+                firstFailure += "; memory load also returned false, bytes=" + std::to_string(g_romData.size());
+            }
+        } else {
+            firstFailure += "; could not read ROM into memory";
+        }
+    }
+
     if (ok) {
         g_gameLoaded = true;
         g_loadedPath = localPath;
         p_retro_get_system_av_info(&g_avInfo);
         g_lastError = "retro_load_game success. geometry=" +
                 std::to_string(g_avInfo.geometry.base_width) + "x" +
-                std::to_string(g_avInfo.geometry.base_height);
+                std::to_string(g_avInfo.geometry.base_height) +
+                ". romBytes=" + std::to_string(g_romData.size()) +
+                ". path=" + localPath;
         LOGI("%s", g_lastError.c_str());
     } else {
-        set_last_error("retro_load_game returned false for path: " + localPath +
+        set_last_error("retro_load_game failed. " + firstFailure +
+                       ". path=" + localPath +
                        ". Core=" +
                        (g_systemInfo.library_name ? g_systemInfo.library_name : "unknown") +
                        " " +
                        (g_systemInfo.library_version ? g_systemInfo.library_version : "unknown") +
+                       ". needFullPath=" + (g_systemInfo.need_fullpath ? std::string("true") : std::string("false")) +
+                       ". validExtensions=" +
+                       (g_systemInfo.valid_extensions ? g_systemInfo.valid_extensions : "unknown") +
                        ". systemDir=" + g_systemDirectory +
                        ". saveDir=" + g_saveDirectory);
     }
@@ -287,6 +339,7 @@ Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
         p_retro_unload_game();
         g_gameLoaded = false;
         g_loadedPath.clear();
+        g_romData.clear();
         g_lastError = "ROM unloaded.";
     }
 }
