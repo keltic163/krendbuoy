@@ -74,6 +74,17 @@ static bool readFile(const std::string& path, std::vector<uint8_t>& out) {
     return true;
 }
 
+static uint32_t rgb565ToArgb(uint16_t p) {
+    uint8_t r = static_cast<uint8_t>(((p >> 11) & 0x1F) * 255 / 31);
+    uint8_t g = static_cast<uint8_t>(((p >> 5) & 0x3F) * 255 / 63);
+    uint8_t b = static_cast<uint8_t>((p & 0x1F) * 255 / 31);
+    return 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+}
+
+static uint32_t xrgb8888ToArgb(uint32_t p) {
+    return 0xFF000000u | (p & 0x00FFFFFFu);
+}
+
 static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!data || !w || !h) return;
 
@@ -87,15 +98,21 @@ static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     frameHeight = static_cast<int>(h);
     framePixels.resize(static_cast<size_t>(w) * static_cast<size_t>(h));
 
-    const uint16_t* src = static_cast<const uint16_t*>(data);
-    size_t srcStride = pitch / sizeof(uint16_t);
-    for (unsigned y = 0; y < h; y++) {
-        for (unsigned x = 0; x < w; x++) {
-            uint16_t p = src[y * srcStride + x];
-            uint8_t r = static_cast<uint8_t>(((p >> 11) & 0x1F) * 255 / 31);
-            uint8_t g = static_cast<uint8_t>(((p >> 5) & 0x3F) * 255 / 63);
-            uint8_t b = static_cast<uint8_t>((p & 0x1F) * 255 / 31);
-            framePixels[y * w + x] = 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+    if (pitch >= w * 4) {
+        const uint32_t* src = static_cast<const uint32_t*>(data);
+        size_t srcStride = pitch / sizeof(uint32_t);
+        for (unsigned y = 0; y < h; y++) {
+            for (unsigned x = 0; x < w; x++) {
+                framePixels[y * w + x] = xrgb8888ToArgb(src[y * srcStride + x]);
+            }
+        }
+    } else {
+        const uint16_t* src = static_cast<const uint16_t*>(data);
+        size_t srcStride = pitch / sizeof(uint16_t);
+        for (unsigned y = 0; y < h; y++) {
+            for (unsigned x = 0; x < w; x++) {
+                framePixels[y * w + x] = rgb565ToArgb(src[y * srcStride + x]);
+            }
         }
     }
 }
