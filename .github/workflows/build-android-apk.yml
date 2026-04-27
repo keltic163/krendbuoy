@@ -2,6 +2,9 @@ name: build-android-apk
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-android-apk.yml'
 
 jobs:
   build:
