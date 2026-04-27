@@ -11,7 +11,11 @@ public final class NativeBridge {
 
     public static native String getCoreName();
 
+    public static native void setDirectories(String systemDirectory, String saveDirectory);
+
     public static native boolean loadRom(String path);
+
+    public static native String getLastError();
 
     public static native void unloadRom();
 }
