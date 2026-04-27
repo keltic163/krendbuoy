@@ -58,23 +58,39 @@ public class GameActivity extends Activity {
 
         try {
             File localRom = copyRomToLocalFile(romUri);
+            File systemDir = ensureDirectory("system");
+            File saveDir = ensureDirectory("save");
+            NativeBridge.setDirectories(systemDir.getAbsolutePath(), saveDir.getAbsolutePath());
+
             boolean loaded = NativeBridge.loadRom(localRom.getAbsolutePath());
+            String diagnostic = NativeBridge.getLastError();
             String message = "ROM copied to local storage:\n" +
                     localRom.getAbsolutePath() +
+                    "\n\nSystem directory:\n" +
+                    systemDir.getAbsolutePath() +
+                    "\n\nSave directory:\n" +
+                    saveDir.getAbsolutePath() +
                     "\n\nNativeBridge.loadRom(): " +
                     (loaded ? "success" : "failed") +
-                    "\n\nNext step:\nconnect this native load to retro_load_game() and start video rendering.";
+                    "\n\nNative diagnostic:\n" +
+                    (diagnostic == null || diagnostic.isEmpty() ? "No native diagnostic reported." : diagnostic) +
+                    "\n\nNext step:\nconnect this native load to video rendering.";
             updateInfo(message);
         } catch (Throwable t) {
             updateInfo("ROM prepare/load failed:\n" + t.getMessage());
         }
     }
 
-    private File copyRomToLocalFile(Uri romUri) throws Exception {
-        File dir = new File(getFilesDir(), "roms");
+    private File ensureDirectory(String name) throws Exception {
+        File dir = new File(getFilesDir(), name);
         if (!dir.exists() && !dir.mkdirs()) {
-            throw new IllegalStateException("Could not create ROM directory: " + dir.getAbsolutePath());
+            throw new IllegalStateException("Could not create directory: " + dir.getAbsolutePath());
         }
+        return dir;
+    }
+
+    private File copyRomToLocalFile(Uri romUri) throws Exception {
+        File dir = ensureDirectory("roms");
 
         String name = sanitizeFileName(getDisplayName(romUri));
         if (name.isEmpty()) {
