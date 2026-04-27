@@ -4,7 +4,13 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'android-app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
       - '.github/workflows/build-android-apk.yml'
+      - 'scripts/build-android-libretro.sh'
+      - 'src/libretro/**'
+      - 'src/core/**'
 
 jobs:
   build:
