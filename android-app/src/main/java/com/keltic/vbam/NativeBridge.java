@@ -1,6 +1,17 @@
 package com.keltic.vbam;
 
 public final class NativeBridge {
+    public static final int BUTTON_A = 0;
+    public static final int BUTTON_B = 1;
+    public static final int BUTTON_SELECT = 2;
+    public static final int BUTTON_START = 3;
+    public static final int BUTTON_UP = 4;
+    public static final int BUTTON_DOWN = 5;
+    public static final int BUTTON_LEFT = 6;
+    public static final int BUTTON_RIGHT = 7;
+    public static final int BUTTON_L = 8;
+    public static final int BUTTON_R = 9;
+
     static {
         System.loadLibrary("vbam_libretro");
         System.loadLibrary("vbam_frontend");
@@ -22,6 +33,8 @@ public final class NativeBridge {
     public static native int getFrameHeight();
 
     public static native int[] copyFramePixels();
+
+    public static native void setButtonState(int button, boolean pressed);
 
     public static native String getLastError();
 
