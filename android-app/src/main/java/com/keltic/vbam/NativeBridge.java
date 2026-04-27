@@ -36,6 +36,8 @@ public final class NativeBridge {
 
     public static native void setButtonState(int button, boolean pressed);
 
+    public static native int getInputMask();
+
     public static native String getLastError();
 
     public static native void unloadRom();
