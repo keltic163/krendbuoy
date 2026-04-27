@@ -9,7 +9,6 @@ import android.provider.OpenableColumns;
 import android.database.Cursor;
 import android.view.Gravity;
 import android.view.MotionEvent;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -29,7 +28,6 @@ public class GameActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         Uri romUri = getIntent().getData();
 
         FrameLayout root = new FrameLayout(this);
@@ -37,7 +35,7 @@ public class GameActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER);
-        content.setPadding(24, 24, 24, 24);
+        content.setPadding(dp(12), dp(12), dp(12), dp(12));
         root.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -54,7 +52,7 @@ public class GameActivity extends Activity {
 
         info = new TextView(this);
         info.setText("Preparing ROM...");
-        info.setTextSize(13f);
+        info.setTextSize(12f);
         info.setTextColor(Color.DKGRAY);
         info.setGravity(Gravity.CENTER);
         content.addView(info, new LinearLayout.LayoutParams(
@@ -86,19 +84,16 @@ public class GameActivity extends Activity {
             updateInfo("No ROM URI received.");
             return;
         }
-
         try {
             File localRom = copyRomToLocalFile(romUri);
             File systemDir = ensureDirectory("system");
             File saveDir = ensureDirectory("save");
             NativeBridge.setDirectories(systemDir.getAbsolutePath(), saveDir.getAbsolutePath());
-
             boolean loaded = NativeBridge.loadRom(localRom.getAbsolutePath());
             if (!loaded) {
                 updateInfo("loadRom failed:\n" + NativeBridge.getLastError());
                 return;
             }
-
             updateInfo("Running...\n" + NativeBridge.getLastError());
             startFrameLoop();
         } catch (Throwable t) {
@@ -107,9 +102,7 @@ public class GameActivity extends Activity {
     }
 
     private void startFrameLoop() {
-        if (running) {
-            return;
-        }
+        if (running) return;
         running = true;
         frameThread = new Thread(() -> {
             long frame = 0;
@@ -125,14 +118,14 @@ public class GameActivity extends Activity {
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
                     }
                     frame++;
-                    if (frame % 30 == 0) {
-                        updateInfo(NativeBridge.getLastError());
+                    if (frame % 10 == 0) {
+                        int inputMask = NativeBridge.getInputMask();
+                        updateInfo(NativeBridge.getLastError() + "\nLIVE inputMask=" + inputMask);
                     }
                 } else {
                     updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
                     running = false;
                 }
-
                 long elapsed = System.currentTimeMillis() - start;
                 long sleep = 16L - elapsed;
                 if (sleep > 0) {
@@ -149,11 +142,14 @@ public class GameActivity extends Activity {
     }
 
     private void addVirtualControls(FrameLayout root) {
-        int keySize = dp(62);
-        int smallWidth = dp(92);
-        int smallHeight = dp(44);
-        int margin = dp(18);
+        int keySize = dp(58);
+        int shoulderWidth = dp(72);
+        int shoulderHeight = dp(44);
+        int menuWidth = dp(88);
+        int menuHeight = dp(42);
+        int margin = dp(16);
         int gap = dp(8);
+        int bottomPad = dp(56);
 
         FrameLayout controls = new FrameLayout(this);
         controls.setClipChildren(false);
@@ -164,50 +160,44 @@ public class GameActivity extends Activity {
         ));
 
         addControl(controls, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, margin + keySize * 2 + gap * 2);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad + keySize * 2 + gap * 2);
         addControl(controls, "←", NativeBridge.BUTTON_LEFT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin, margin + keySize + gap);
+                Gravity.BOTTOM | Gravity.LEFT, margin, bottomPad + keySize + gap);
         addControl(controls, "→", NativeBridge.BUTTON_RIGHT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, margin + keySize + gap);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, bottomPad + keySize + gap);
         addControl(controls, "↓", NativeBridge.BUTTON_DOWN, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, margin);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad);
 
         addControl(controls, "B", NativeBridge.BUTTON_B, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap, margin + keySize + gap);
+                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap, bottomPad + keySize + gap);
         addControl(controls, "A", NativeBridge.BUTTON_A, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin, margin + keySize * 2 + gap * 2);
+                Gravity.BOTTOM | Gravity.RIGHT, margin, bottomPad + keySize * 2 + gap * 2);
 
-        addControl(controls, "L", NativeBridge.BUTTON_L, keySize, dp(48),
+        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
                 Gravity.TOP | Gravity.LEFT, margin, margin);
-        addControl(controls, "R", NativeBridge.BUTTON_R, keySize, dp(48),
+        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
                 Gravity.TOP | Gravity.RIGHT, margin, margin);
 
-        addControl(controls, "Select", NativeBridge.BUTTON_SELECT, smallWidth, smallHeight,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, smallWidth / 2 + gap, margin);
-        addControl(controls, "Start", NativeBridge.BUTTON_START, smallWidth, smallHeight,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, -(smallWidth / 2 + gap), margin);
+        addControl(controls, "Select", NativeBridge.BUTTON_SELECT, menuWidth, menuHeight,
+                Gravity.BOTTOM | Gravity.LEFT, dp(168), dp(8));
+        addControl(controls, "Start", NativeBridge.BUTTON_START, menuWidth, menuHeight,
+                Gravity.BOTTOM | Gravity.RIGHT, dp(168), dp(8));
     }
 
-    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int rightOrLeftMargin, int bottomOrTopMargin) {
+    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {
         TextView view = makeButton(label, button);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
-        if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) {
-            lp.rightMargin = rightOrLeftMargin;
-        } else if ((gravity & Gravity.LEFT) == Gravity.LEFT) {
-            lp.leftMargin = rightOrLeftMargin;
-        }
-        if ((gravity & Gravity.TOP) == Gravity.TOP) {
-            lp.topMargin = bottomOrTopMargin;
-        } else {
-            lp.bottomMargin = bottomOrTopMargin;
-        }
+        if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
+        else if ((gravity & Gravity.LEFT) == Gravity.LEFT) lp.leftMargin = horizontalMargin;
+        if ((gravity & Gravity.TOP) == Gravity.TOP) lp.topMargin = verticalMargin;
+        else lp.bottomMargin = verticalMargin;
         parent.addView(view, lp);
     }
 
     private TextView makeButton(String label, int button) {
         TextView view = new TextView(this);
         view.setText(label);
-        view.setTextSize(label.length() > 1 ? 14f : 22f);
+        view.setTextSize(label.length() > 1 ? 13f : 22f);
         view.setTextColor(Color.WHITE);
         view.setGravity(Gravity.CENTER);
         view.setBackgroundColor(0xAA333333);
@@ -217,12 +207,14 @@ public class GameActivity extends Activity {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN:
                     NativeBridge.setButtonState(button, true);
+                    updateInfo("Pressed " + label + "\nLIVE inputMask=" + NativeBridge.getInputMask());
                     v.setAlpha(1.0f);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_CANCEL:
                     NativeBridge.setButtonState(button, false);
+                    updateInfo("Released " + label + "\nLIVE inputMask=" + NativeBridge.getInputMask());
                     v.setAlpha(0.85f);
                     return true;
                 default:
@@ -233,9 +225,7 @@ public class GameActivity extends Activity {
     }
 
     private void releaseAllButtons() {
-        for (int i = 0; i <= NativeBridge.BUTTON_R; i++) {
-            NativeBridge.setButtonState(i, false);
-        }
+        for (int i = 0; i <= NativeBridge.BUTTON_R; i++) NativeBridge.setButtonState(i, false);
     }
 
     private int dp(int value) {
@@ -244,29 +234,21 @@ public class GameActivity extends Activity {
 
     private File ensureDirectory(String name) throws Exception {
         File dir = new File(getFilesDir(), name);
-        if (!dir.exists() && !dir.mkdirs()) {
-            throw new IllegalStateException("Could not create directory: " + dir.getAbsolutePath());
-        }
+        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Could not create directory: " + dir.getAbsolutePath());
         return dir;
     }
 
     private File copyRomToLocalFile(Uri romUri) throws Exception {
         File dir = ensureDirectory("roms");
         String name = sanitizeFileName(getDisplayName(romUri));
-        if (name.isEmpty()) {
-            name = "selected.rom";
-        }
+        if (name.isEmpty()) name = "selected.rom";
         File outFile = new File(dir, name);
         try (InputStream input = getContentResolver().openInputStream(romUri);
              FileOutputStream output = new FileOutputStream(outFile)) {
-            if (input == null) {
-                throw new IllegalStateException("Could not open selected ROM.");
-            }
+            if (input == null) throw new IllegalStateException("Could not open selected ROM.");
             byte[] buffer = new byte[1024 * 64];
             int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
         }
         return outFile;
     }
@@ -277,9 +259,7 @@ public class GameActivity extends Activity {
                 int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                 if (index >= 0) {
                     String name = cursor.getString(index);
-                    if (name != null) {
-                        return name;
-                    }
+                    if (name != null) return name;
                 }
             }
         } catch (Throwable ignored) {
@@ -288,9 +268,7 @@ public class GameActivity extends Activity {
     }
 
     private String sanitizeFileName(String input) {
-        if (input == null) {
-            return "";
-        }
+        if (input == null) return "";
         return input.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
