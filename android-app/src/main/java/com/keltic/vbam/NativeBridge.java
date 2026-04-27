@@ -17,6 +17,12 @@ public final class NativeBridge {
 
     public static native boolean runFrame();
 
+    public static native int getFrameWidth();
+
+    public static native int getFrameHeight();
+
+    public static native int[] copyFramePixels();
+
     public static native String getLastError();
 
     public static native void unloadRom();
