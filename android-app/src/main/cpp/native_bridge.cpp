@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <dlfcn.h>
+#include <atomic>
 #include <cstdint>
 #include <fstream>
 #include <mutex>
@@ -30,6 +31,19 @@ static std::mutex frameMutex;
 static std::vector<uint32_t> framePixels;
 static int frameWidth = 0;
 static int frameHeight = 0;
+
+static std::atomic_bool buttonStates[10];
+
+static constexpr int BTN_A = 0;
+static constexpr int BTN_B = 1;
+static constexpr int BTN_SELECT = 2;
+static constexpr int BTN_START = 3;
+static constexpr int BTN_UP = 4;
+static constexpr int BTN_DOWN = 5;
+static constexpr int BTN_LEFT = 6;
+static constexpr int BTN_RIGHT = 7;
+static constexpr int BTN_L = 8;
+static constexpr int BTN_R = 9;
 
 #define LOADSYM(name) do { p_##name = reinterpret_cast<name##_t>(dlsym(core, #name)); if (!p_##name) { fail(std::string("Missing symbol: ") + #name); return false; } } while (0)
 
@@ -119,7 +133,31 @@ static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
 static void audioCb(int16_t, int16_t) {}
 static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
 static void inputPollCb() {}
-static int16_t inputStateCb(unsigned, unsigned, unsigned, unsigned) { return 0; }
+static int16_t inputStateCb(unsigned port, unsigned device, unsigned, unsigned id) {
+    if (port != 0 || device != RETRO_DEVICE_JOYPAD) {
+        return 0;
+    }
+
+    switch (id) {
+        case RETRO_DEVICE_ID_JOYPAD_A: return buttonStates[BTN_A].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_B: return buttonStates[BTN_B].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_SELECT: return buttonStates[BTN_SELECT].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_START: return buttonStates[BTN_START].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_UP: return buttonStates[BTN_UP].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_DOWN: return buttonStates[BTN_DOWN].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_LEFT: return buttonStates[BTN_LEFT].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_RIGHT: return buttonStates[BTN_RIGHT].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_L: return buttonStates[BTN_L].load() ? 1 : 0;
+        case RETRO_DEVICE_ID_JOYPAD_R: return buttonStates[BTN_R].load() ? 1 : 0;
+        default: return 0;
+    }
+}
+
+static void clearButtons() {
+    for (auto& buttonState : buttonStates) {
+        buttonState.store(false);
+    }
+}
 
 static bool envCb(unsigned cmd, void* data) {
     switch (cmd) {
@@ -194,6 +232,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_loadRom(
     if (!initCore()) return JNI_FALSE;
     if (loaded) { p_retro_unload_game(); loaded = false; }
     frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0;
+    clearButtons();
     {
         std::lock_guard<std::mutex> lock(frameMutex);
         framePixels.clear();
@@ -238,11 +277,19 @@ extern "C" JNIEXPORT jintArray JNICALL Java_com_keltic_vbam_NativeBridge_copyFra
     return result;
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setButtonState(JNIEnv*, jclass, jint button, jboolean pressed) {
+    if (button < 0 || button >= 10) {
+        return;
+    }
+    buttonStates[button].store(pressed == JNI_TRUE);
+}
+
 extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
     return env->NewStringUTF(last.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
+    clearButtons();
     if (loaded && p_retro_unload_game) p_retro_unload_game();
     loaded = false; romData.clear(); last = "ROM unloaded.";
 }
