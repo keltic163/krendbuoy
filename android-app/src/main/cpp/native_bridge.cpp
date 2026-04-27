@@ -1,47 +1,49 @@
 #include <jni.h>
 #include <android/log.h>
 #include <dlfcn.h>
-
 #include <cstdint>
-#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
-
 #include "libretro.h"
 
 #define LOG_TAG "VBAMFrontend"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
-static void* g_coreHandle = nullptr;
-static bool g_coreInitialized = false;
-static bool g_gameLoaded = false;
-static std::string g_loadedPath;
-static std::string g_systemDirectory;
-static std::string g_saveDirectory;
-static std::string g_lastError = "No operation yet.";
-static retro_system_info g_systemInfo = {};
-static retro_system_av_info g_avInfo = {};
-static std::vector<uint8_t> g_romData;
+static void* core = nullptr;
+static bool initialized = false;
+static bool loaded = false;
+static std::string systemDir;
+static std::string saveDir;
+static std::string last = "No operation yet.";
+static std::vector<uint8_t> romData;
+static retro_system_info sysInfo = {};
+static retro_system_av_info avInfo = {};
+static uint64_t frames = 0;
+static uint64_t videoFrames = 0;
+static unsigned lastW = 0;
+static unsigned lastH = 0;
+static size_t lastPitch = 0;
 
-typedef void (*retro_init_t)(void);
-typedef void (*retro_deinit_t)(void);
-typedef unsigned (*retro_api_version_t)(void);
-typedef void (*retro_set_environment_t)(retro_environment_t cb);
-typedef void (*retro_set_video_refresh_t)(retro_video_refresh_t cb);
-typedef void (*retro_set_audio_sample_t)(retro_audio_sample_t cb);
-typedef void (*retro_set_audio_sample_batch_t)(retro_audio_sample_batch_t cb);
-typedef void (*retro_set_input_poll_t)(retro_input_poll_t cb);
-typedef void (*retro_set_input_state_t)(retro_input_state_t cb);
-typedef bool (*retro_load_game_t)(const struct retro_game_info* game);
-typedef void (*retro_unload_game_t)(void);
-typedef void (*retro_get_system_info_t)(struct retro_system_info* info);
-typedef void (*retro_get_system_av_info_t)(struct retro_system_av_info* info);
+#define LOADSYM(name) do { p_##name = reinterpret_cast<name##_t>(dlsym(core, #name)); if (!p_##name) { fail(std::string("Missing symbol: ") + #name); return false; } } while (0)
+
+typedef void (*retro_init_t)();
+typedef void (*retro_deinit_t)();
+typedef void (*retro_set_environment_t)(retro_environment_t);
+typedef void (*retro_set_video_refresh_t)(retro_video_refresh_t);
+typedef void (*retro_set_audio_sample_t)(retro_audio_sample_t);
+typedef void (*retro_set_audio_sample_batch_t)(retro_audio_sample_batch_t);
+typedef void (*retro_set_input_poll_t)(retro_input_poll_t);
+typedef void (*retro_set_input_state_t)(retro_input_state_t);
+typedef bool (*retro_load_game_t)(const retro_game_info*);
+typedef void (*retro_unload_game_t)();
+typedef void (*retro_get_system_info_t)(retro_system_info*);
+typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);
+typedef void (*retro_run_t)();
 
 static retro_init_t p_retro_init = nullptr;
 static retro_deinit_t p_retro_deinit = nullptr;
-static retro_api_version_t p_retro_api_version = nullptr;
 static retro_set_environment_t p_retro_set_environment = nullptr;
 static retro_set_video_refresh_t p_retro_set_video_refresh = nullptr;
 static retro_set_audio_sample_t p_retro_set_audio_sample = nullptr;
@@ -52,58 +54,40 @@ static retro_load_game_t p_retro_load_game = nullptr;
 static retro_unload_game_t p_retro_unload_game = nullptr;
 static retro_get_system_info_t p_retro_get_system_info = nullptr;
 static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;
+static retro_run_t p_retro_run = nullptr;
 
-static void set_last_error(const std::string& message) {
-    g_lastError = message;
-    LOGE("%s", message.c_str());
-}
+static void fail(const std::string& s) { last = s; LOGE("%s", s.c_str()); }
 
-static bool read_file(const std::string& path, std::vector<uint8_t>& out) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) {
-        set_last_error("memory load failed: could not open ROM file: " + path);
-        return false;
-    }
-
-    std::ifstream::pos_type size = file.tellg();
-    if (size <= 0) {
-        set_last_error("memory load failed: ROM file is empty or unreadable: " + path);
-        return false;
-    }
-
-    out.resize(static_cast<size_t>(size));
-    file.seekg(0, std::ios::beg);
-    if (!file.read(reinterpret_cast<char*>(out.data()), size)) {
-        set_last_error("memory load failed: could not read entire ROM file: " + path);
-        out.clear();
-        return false;
-    }
-
+static bool readFile(const std::string& path, std::vector<uint8_t>& out) {
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f) { fail("Could not open ROM: " + path); return false; }
+    auto size = f.tellg();
+    if (size <= 0) { fail("ROM is empty: " + path); return false; }
+    out.resize((size_t)size);
+    f.seekg(0, std::ios::beg);
+    if (!f.read(reinterpret_cast<char*>(out.data()), size)) { out.clear(); fail("Could not read ROM: " + path); return false; }
     return true;
 }
 
-static void frontend_video_refresh(const void*, unsigned width, unsigned height, size_t pitch) {
-    (void)width;
-    (void)height;
-    (void)pitch;
+static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
+    if (data && w && h) { videoFrames++; lastW = w; lastH = h; lastPitch = pitch; }
 }
+static void audioCb(int16_t, int16_t) {}
+static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
+static void inputPollCb() {}
+static int16_t inputStateCb(unsigned, unsigned, unsigned, unsigned) { return 0; }
 
-static void frontend_audio_sample(int16_t, int16_t) {
-}
-
-static size_t frontend_audio_sample_batch(const int16_t*, size_t frames) {
-    return frames;
-}
-
-static void frontend_input_poll(void) {
-}
-
-static int16_t frontend_input_state(unsigned, unsigned, unsigned, unsigned) {
-    return 0;
-}
-
-static bool frontend_environment(unsigned cmd, void* data) {
+static bool envCb(unsigned cmd, void* data) {
     switch (cmd) {
+        case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+            if (data && !systemDir.empty()) { *static_cast<const char**>(data) = systemDir.c_str(); return true; }
+            return false;
+        case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+            if (data && !saveDir.empty()) { *static_cast<const char**>(data) = saveDir.c_str(); return true; }
+            return false;
+        case RETRO_ENVIRONMENT_GET_CAN_DUPE:
+            if (data) { *static_cast<bool*>(data) = true; return true; }
+            return false;
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
         case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
@@ -112,234 +96,82 @@ static bool frontend_environment(unsigned cmd, void* data) {
         case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
         case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
             return true;
-
-        case RETRO_ENVIRONMENT_GET_CAN_DUPE:
-            if (data) {
-                *static_cast<bool*>(data) = true;
-                return true;
-            }
-            return false;
-
-        case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
-            if (data && !g_systemDirectory.empty()) {
-                *static_cast<const char**>(data) = g_systemDirectory.c_str();
-                return true;
-            }
-            return false;
-
-        case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
-            if (data && !g_saveDirectory.empty()) {
-                *static_cast<const char**>(data) = g_saveDirectory.c_str();
-                return true;
-            }
-            return false;
-
-        case RETRO_ENVIRONMENT_GET_LOG_INTERFACE:
-        case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE:
-        case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
-        case RETRO_ENVIRONMENT_GET_VARIABLE:
         default:
             return false;
     }
 }
 
-template <typename T>
-static bool load_symbol(T* out, const char* name) {
-    *out = reinterpret_cast<T>(dlsym(g_coreHandle, name));
-    if (*out == nullptr) {
-        set_last_error(std::string("Missing libretro symbol: ") + name);
-        return false;
+static bool initCore() {
+    if (initialized) return true;
+    if (!core) {
+        core = dlopen("libvbam_libretro.so", RTLD_NOW | RTLD_GLOBAL);
+        if (!core) { const char* e = dlerror(); fail(std::string("dlopen failed: ") + (e ? e : "unknown")); return false; }
     }
-    return true;
-}
-
-static bool ensure_core_symbols_loaded() {
-    if (g_coreHandle == nullptr) {
-        g_coreHandle = dlopen("libvbam_libretro.so", RTLD_NOW | RTLD_GLOBAL);
-        if (g_coreHandle == nullptr) {
-            const char* error = dlerror();
-            set_last_error(std::string("dlopen libvbam_libretro.so failed: ") + (error ? error : "unknown error"));
-            return false;
-        }
-    }
-
-    bool ok = load_symbol(&p_retro_init, "retro_init") &&
-              load_symbol(&p_retro_deinit, "retro_deinit") &&
-              load_symbol(&p_retro_api_version, "retro_api_version") &&
-              load_symbol(&p_retro_set_environment, "retro_set_environment") &&
-              load_symbol(&p_retro_set_video_refresh, "retro_set_video_refresh") &&
-              load_symbol(&p_retro_set_audio_sample, "retro_set_audio_sample") &&
-              load_symbol(&p_retro_set_audio_sample_batch, "retro_set_audio_sample_batch") &&
-              load_symbol(&p_retro_set_input_poll, "retro_set_input_poll") &&
-              load_symbol(&p_retro_set_input_state, "retro_set_input_state") &&
-              load_symbol(&p_retro_load_game, "retro_load_game") &&
-              load_symbol(&p_retro_unload_game, "retro_unload_game") &&
-              load_symbol(&p_retro_get_system_info, "retro_get_system_info") &&
-              load_symbol(&p_retro_get_system_av_info, "retro_get_system_av_info");
-    if (ok) {
-        g_lastError = "Core symbols loaded.";
-    }
-    return ok;
-}
-
-static bool ensure_core_initialized() {
-    if (g_coreInitialized) {
-        return true;
-    }
-
-    if (!ensure_core_symbols_loaded()) {
-        return false;
-    }
-
-    p_retro_set_environment(frontend_environment);
-    p_retro_set_video_refresh(frontend_video_refresh);
-    p_retro_set_audio_sample(frontend_audio_sample);
-    p_retro_set_audio_sample_batch(frontend_audio_sample_batch);
-    p_retro_set_input_poll(frontend_input_poll);
-    p_retro_set_input_state(frontend_input_state);
+    LOADSYM(retro_init); LOADSYM(retro_deinit); LOADSYM(retro_set_environment); LOADSYM(retro_set_video_refresh);
+    LOADSYM(retro_set_audio_sample); LOADSYM(retro_set_audio_sample_batch); LOADSYM(retro_set_input_poll);
+    LOADSYM(retro_set_input_state); LOADSYM(retro_load_game); LOADSYM(retro_unload_game);
+    LOADSYM(retro_get_system_info); LOADSYM(retro_get_system_av_info); LOADSYM(retro_run);
+    p_retro_set_environment(envCb);
+    p_retro_set_video_refresh(videoCb);
+    p_retro_set_audio_sample(audioCb);
+    p_retro_set_audio_sample_batch(audioBatchCb);
+    p_retro_set_input_poll(inputPollCb);
+    p_retro_set_input_state(inputStateCb);
     p_retro_init();
-    p_retro_get_system_info(&g_systemInfo);
-    g_coreInitialized = true;
-
-    g_lastError = std::string("Core initialized: ") +
-            (g_systemInfo.library_name ? g_systemInfo.library_name : "unknown") +
-            " " +
-            (g_systemInfo.library_version ? g_systemInfo.library_version : "unknown");
-    LOGI("%s", g_lastError.c_str());
+    p_retro_get_system_info(&sysInfo);
+    initialized = true;
+    last = std::string("Core initialized: ") + (sysInfo.library_name ? sysInfo.library_name : "unknown");
+    LOGI("%s", last.c_str());
     return true;
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_keltic_vbam_NativeBridge_getCoreName(JNIEnv* env, jclass) {
-    if (!ensure_core_initialized()) {
-        return env->NewStringUTF("VBA-M core unavailable");
-    }
-
-    std::string name = g_systemInfo.library_name ? g_systemInfo.library_name : "VBA-M";
-    if (g_systemInfo.library_version) {
-        name += " ";
-        name += g_systemInfo.library_version;
-    }
-    return env->NewStringUTF(name.c_str());
+extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getCoreName(JNIEnv* env, jclass) {
+    if (!initCore()) return env->NewStringUTF("VBA-M core unavailable");
+    return env->NewStringUTF(sysInfo.library_name ? sysInfo.library_name : "VBA-M");
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_keltic_vbam_NativeBridge_setDirectories(JNIEnv* env, jclass, jstring systemDirectory, jstring saveDirectory) {
-    const char* systemRaw = systemDirectory ? env->GetStringUTFChars(systemDirectory, nullptr) : nullptr;
-    const char* saveRaw = saveDirectory ? env->GetStringUTFChars(saveDirectory, nullptr) : nullptr;
-
-    g_systemDirectory = systemRaw ? systemRaw : "";
-    g_saveDirectory = saveRaw ? saveRaw : "";
-
-    if (systemRaw) {
-        env->ReleaseStringUTFChars(systemDirectory, systemRaw);
-    }
-    if (saveRaw) {
-        env->ReleaseStringUTFChars(saveDirectory, saveRaw);
-    }
-
-    g_lastError = "Directories set. system=" + g_systemDirectory + " save=" + g_saveDirectory;
-    LOGI("%s", g_lastError.c_str());
+extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setDirectories(JNIEnv* env, jclass, jstring systemDirectory, jstring saveDirectory) {
+    const char* s = systemDirectory ? env->GetStringUTFChars(systemDirectory, nullptr) : nullptr;
+    const char* v = saveDirectory ? env->GetStringUTFChars(saveDirectory, nullptr) : nullptr;
+    systemDir = s ? s : "";
+    saveDir = v ? v : "";
+    if (s) env->ReleaseStringUTFChars(systemDirectory, s);
+    if (v) env->ReleaseStringUTFChars(saveDirectory, v);
+    last = "Directories set.";
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
-    if (path == nullptr) {
-        set_last_error("loadRom failed: path was null.");
-        return JNI_FALSE;
-    }
-
-    const char* rawPath = env->GetStringUTFChars(path, nullptr);
-    if (rawPath == nullptr || rawPath[0] == '\0') {
-        if (rawPath != nullptr) {
-            env->ReleaseStringUTFChars(path, rawPath);
-        }
-        set_last_error("loadRom failed: path was empty.");
-        return JNI_FALSE;
-    }
-
-    std::string localPath(rawPath);
-    env->ReleaseStringUTFChars(path, rawPath);
-
-    if (g_systemDirectory.empty() || g_saveDirectory.empty()) {
-        set_last_error("loadRom failed: system/save directories were not set before loading ROM.");
-        return JNI_FALSE;
-    }
-
-    if (!ensure_core_initialized()) {
-        return JNI_FALSE;
-    }
-
-    if (g_gameLoaded) {
-        p_retro_unload_game();
-        g_gameLoaded = false;
-    }
-
-    retro_game_info pathGame = {};
-    pathGame.path = localPath.c_str();
-    pathGame.data = nullptr;
-    pathGame.size = 0;
-    pathGame.meta = nullptr;
-
-    bool ok = p_retro_load_game(&pathGame);
-    std::string firstFailure = "path load returned false";
-
-    if (!ok) {
-        g_romData.clear();
-        if (read_file(localPath, g_romData)) {
-            retro_game_info memoryGame = {};
-            memoryGame.path = localPath.c_str();
-            memoryGame.data = g_romData.data();
-            memoryGame.size = g_romData.size();
-            memoryGame.meta = nullptr;
-            ok = p_retro_load_game(&memoryGame);
-            if (!ok) {
-                firstFailure += "; memory load also returned false, bytes=" + std::to_string(g_romData.size());
-            }
-        } else {
-            firstFailure += "; could not read ROM into memory";
-        }
-    }
-
-    if (ok) {
-        g_gameLoaded = true;
-        g_loadedPath = localPath;
-        p_retro_get_system_av_info(&g_avInfo);
-        g_lastError = "retro_load_game success. geometry=" +
-                std::to_string(g_avInfo.geometry.base_width) + "x" +
-                std::to_string(g_avInfo.geometry.base_height) +
-                ". romBytes=" + std::to_string(g_romData.size()) +
-                ". path=" + localPath;
-        LOGI("%s", g_lastError.c_str());
-    } else {
-        set_last_error("retro_load_game failed. " + firstFailure +
-                       ". path=" + localPath +
-                       ". Core=" +
-                       (g_systemInfo.library_name ? g_systemInfo.library_name : "unknown") +
-                       " " +
-                       (g_systemInfo.library_version ? g_systemInfo.library_version : "unknown") +
-                       ". needFullPath=" + (g_systemInfo.need_fullpath ? std::string("true") : std::string("false")) +
-                       ". validExtensions=" +
-                       (g_systemInfo.valid_extensions ? g_systemInfo.valid_extensions : "unknown") +
-                       ". systemDir=" + g_systemDirectory +
-                       ". saveDir=" + g_saveDirectory);
-    }
-
-    return ok ? JNI_TRUE : JNI_FALSE;
+extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_loadRom(JNIEnv* env, jclass, jstring path) {
+    const char* raw = path ? env->GetStringUTFChars(path, nullptr) : nullptr;
+    if (!raw || raw[0] == 0) { if (raw) env->ReleaseStringUTFChars(path, raw); fail("loadRom failed: empty path"); return JNI_FALSE; }
+    std::string localPath(raw);
+    env->ReleaseStringUTFChars(path, raw);
+    if (systemDir.empty() || saveDir.empty()) { fail("loadRom failed: directories not set"); return JNI_FALSE; }
+    if (!initCore()) return JNI_FALSE;
+    if (loaded) { p_retro_unload_game(); loaded = false; }
+    frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0;
+    retro_game_info game = {}; game.path = localPath.c_str();
+    bool ok = p_retro_load_game(&game);
+    if (!ok && readFile(localPath, romData)) { game.data = romData.data(); game.size = romData.size(); ok = p_retro_load_game(&game); }
+    if (!ok) { fail("retro_load_game failed. path=" + localPath); return JNI_FALSE; }
+    loaded = true;
+    p_retro_get_system_av_info(&avInfo);
+    last = "retro_load_game success. geometry=" + std::to_string(avInfo.geometry.base_width) + "x" + std::to_string(avInfo.geometry.base_height) + ". romBytes=" + std::to_string(romData.size());
+    return JNI_TRUE;
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
-    return env->NewStringUTF(g_lastError.c_str());
+extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_runFrame(JNIEnv*, jclass) {
+    if (!loaded || !p_retro_run) { fail("runFrame failed: game not loaded"); return JNI_FALSE; }
+    p_retro_run();
+    frames++;
+    last = "retro_run success. frames=" + std::to_string(frames) + ". videoCallbacks=" + std::to_string(videoFrames) + ". lastVideo=" + std::to_string(lastW) + "x" + std::to_string(lastH) + ". pitch=" + std::to_string(lastPitch);
+    return JNI_TRUE;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
-    if (g_gameLoaded && p_retro_unload_game != nullptr) {
-        p_retro_unload_game();
-        g_gameLoaded = false;
-        g_loadedPath.clear();
-        g_romData.clear();
-        g_lastError = "ROM unloaded.";
-    }
+extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) {
+    return env->NewStringUTF(last.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
+    if (loaded && p_retro_unload_game) p_retro_unload_game();
+    loaded = false; romData.clear(); last = "ROM unloaded.";
 }
