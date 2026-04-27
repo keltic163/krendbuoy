@@ -2,12 +2,16 @@ package com.keltic.vbam;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.database.Cursor;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -28,15 +32,21 @@ public class GameActivity extends Activity {
 
         Uri romUri = getIntent().getData();
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(24, 24, 24, 24);
+        FrameLayout root = new FrameLayout(this);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(24, 24, 24, 24);
+        root.addView(content, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
 
         screen = new ImageView(this);
         screen.setAdjustViewBounds(true);
         screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        root.addView(screen, new LinearLayout.LayoutParams(
+        content.addView(screen, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1f
@@ -45,19 +55,28 @@ public class GameActivity extends Activity {
         info = new TextView(this);
         info.setText("Preparing ROM...");
         info.setTextSize(13f);
+        info.setTextColor(Color.DKGRAY);
         info.setGravity(Gravity.CENTER);
-        root.addView(info, new LinearLayout.LayoutParams(
+        content.addView(info, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        addVirtualControls(root);
         setContentView(root);
         new Thread(() -> prepareAndStart(romUri)).start();
     }
 
     @Override
+    protected void onPause() {
+        releaseAllButtons();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
         running = false;
+        releaseAllButtons();
         NativeBridge.unloadRom();
         super.onDestroy();
     }
@@ -127,6 +146,100 @@ public class GameActivity extends Activity {
             }
         }, "VBAM-frame-loop");
         frameThread.start();
+    }
+
+    private void addVirtualControls(FrameLayout root) {
+        int keySize = dp(62);
+        int smallWidth = dp(92);
+        int smallHeight = dp(44);
+        int margin = dp(18);
+        int gap = dp(8);
+
+        FrameLayout controls = new FrameLayout(this);
+        controls.setClipChildren(false);
+        controls.setClipToPadding(false);
+        root.addView(controls, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        addControl(controls, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, margin + keySize * 2 + gap * 2);
+        addControl(controls, "←", NativeBridge.BUTTON_LEFT, keySize, keySize,
+                Gravity.BOTTOM | Gravity.LEFT, margin, margin + keySize + gap);
+        addControl(controls, "→", NativeBridge.BUTTON_RIGHT, keySize, keySize,
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, margin + keySize + gap);
+        addControl(controls, "↓", NativeBridge.BUTTON_DOWN, keySize, keySize,
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, margin);
+
+        addControl(controls, "B", NativeBridge.BUTTON_B, keySize, keySize,
+                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap, margin + keySize + gap);
+        addControl(controls, "A", NativeBridge.BUTTON_A, keySize, keySize,
+                Gravity.BOTTOM | Gravity.RIGHT, margin, margin + keySize * 2 + gap * 2);
+
+        addControl(controls, "L", NativeBridge.BUTTON_L, keySize, dp(48),
+                Gravity.TOP | Gravity.LEFT, margin, margin);
+        addControl(controls, "R", NativeBridge.BUTTON_R, keySize, dp(48),
+                Gravity.TOP | Gravity.RIGHT, margin, margin);
+
+        addControl(controls, "Select", NativeBridge.BUTTON_SELECT, smallWidth, smallHeight,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, smallWidth / 2 + gap, margin);
+        addControl(controls, "Start", NativeBridge.BUTTON_START, smallWidth, smallHeight,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, -(smallWidth / 2 + gap), margin);
+    }
+
+    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int rightOrLeftMargin, int bottomOrTopMargin) {
+        TextView view = makeButton(label, button);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
+        if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) {
+            lp.rightMargin = rightOrLeftMargin;
+        } else if ((gravity & Gravity.LEFT) == Gravity.LEFT) {
+            lp.leftMargin = rightOrLeftMargin;
+        }
+        if ((gravity & Gravity.TOP) == Gravity.TOP) {
+            lp.topMargin = bottomOrTopMargin;
+        } else {
+            lp.bottomMargin = bottomOrTopMargin;
+        }
+        parent.addView(view, lp);
+    }
+
+    private TextView makeButton(String label, int button) {
+        TextView view = new TextView(this);
+        view.setText(label);
+        view.setTextSize(label.length() > 1 ? 14f : 22f);
+        view.setTextColor(Color.WHITE);
+        view.setGravity(Gravity.CENTER);
+        view.setBackgroundColor(0xAA333333);
+        view.setAlpha(0.85f);
+        view.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    NativeBridge.setButtonState(button, true);
+                    v.setAlpha(1.0f);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    NativeBridge.setButtonState(button, false);
+                    v.setAlpha(0.85f);
+                    return true;
+                default:
+                    return true;
+            }
+        });
+        return view;
+    }
+
+    private void releaseAllButtons() {
+        for (int i = 0; i <= NativeBridge.BUTTON_R; i++) {
+            NativeBridge.setButtonState(i, false);
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private File ensureDirectory(String name) throws Exception {
