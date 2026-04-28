@@ -19,6 +19,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Apply quick menu label patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
+          text = path.read_text()
+          text = text.replace('"Resume", "Change ROM", "Audio Preset", "Exit Game"', '"Resume", "Return to Main Menu", "Audio Preset", "Exit Game"')
+          path.write_text(text)
+          PY
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
