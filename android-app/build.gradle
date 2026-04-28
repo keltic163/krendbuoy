@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.keltic.vbam'
+    namespace 'com.krendstudio.krendbuoy'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.keltic.vbam'
+        applicationId 'com.krendstudio.krendbuoy'
         minSdk 23
         targetSdk 34
         versionCode 1
