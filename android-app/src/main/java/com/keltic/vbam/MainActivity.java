@@ -1,9 +1,11 @@
 package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.database.Cursor;
 import android.view.Gravity;
@@ -14,8 +16,9 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+
 public class MainActivity extends Activity {
-    private static final int REQUEST_OPEN_ROM = 1001;
     private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
     private static final int AUDIO_DYNAMIC_VALUE = -1;
     private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
@@ -23,15 +26,18 @@ public class MainActivity extends Activity {
     private TextView statusView;
     private TextView romView;
     private TextView saveFolderView;
+    private Button openRomButton;
+    private Button startButton;
     private Uri selectedRomUri;
     private Uri selectedSaveFolderUri;
     private int selectedAudioBacklogSamples = AUDIO_DYNAMIC_VALUE;
+    private boolean coreLoaded;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        boolean coreLoaded = false;
+        coreLoaded = false;
         String status;
         try {
             System.loadLibrary("vbam_libretro");
@@ -114,7 +120,7 @@ public class MainActivity extends Activity {
         root.addView(audioGroup, audioParams);
 
         Button saveFolderButton = new Button(this);
-        saveFolderButton.setText("Choose Save Folder (optional)");
+        saveFolderButton.setText("Choose Save / ROM Folder");
         saveFolderButton.setOnClickListener(v -> openSaveFolderPicker());
         root.addView(saveFolderButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -122,7 +128,7 @@ public class MainActivity extends Activity {
         ));
 
         saveFolderView = new TextView(this);
-        saveFolderView.setText("Save folder: App private storage\nPortable .sav export disabled");
+        saveFolderView.setText("No folder selected. Choose a folder before selecting ROM.");
         saveFolderView.setTextSize(14f);
         saveFolderView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
@@ -132,17 +138,17 @@ public class MainActivity extends Activity {
         saveParams.setMargins(0, 12, 0, 24);
         root.addView(saveFolderView, saveParams);
 
-        Button openButton = new Button(this);
-        openButton.setText("Choose ROM file");
-        openButton.setEnabled(coreLoaded);
-        openButton.setOnClickListener(v -> openRomPicker());
-        root.addView(openButton, new LinearLayout.LayoutParams(
+        openRomButton = new Button(this);
+        openRomButton.setText("Choose ROM from selected folder");
+        openRomButton.setEnabled(false);
+        openRomButton.setOnClickListener(v -> showRomPickerFromSaveFolder());
+        root.addView(openRomButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
         romView = new TextView(this);
-        romView.setText("No ROM selected. Supported files: .gba, .gb, .gbc");
+        romView.setText("No ROM selected. Supported files in selected folder: .gba, .gb, .gbc");
         romView.setTextSize(15f);
         romView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams romParams = new LinearLayout.LayoutParams(
@@ -152,43 +158,16 @@ public class MainActivity extends Activity {
         romParams.setMargins(0, 32, 0, 32);
         root.addView(romView, romParams);
 
-        Button startButton = new Button(this);
+        startButton = new Button(this);
         startButton.setText("Start Game");
         startButton.setEnabled(false);
-        startButton.setOnClickListener(v -> {
-            if (selectedRomUri != null) {
-                Intent intent = new Intent(this, GameActivity.class);
-                intent.setData(selectedRomUri);
-                intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
-                if (selectedSaveFolderUri != null) {
-                    intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
-                }
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                startActivity(intent);
-            }
-        });
+        startButton.setOnClickListener(v -> startSelectedGame());
         root.addView(startButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        romView.setTag(startButton);
         setContentView(root);
-    }
-
-    private void openRomPicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        String[] mimeTypes = {
-                "application/octet-stream",
-                "application/x-gba-rom",
-                "application/x-gameboy-rom",
-                "application/x-gameboy-color-rom"
-        };
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
-        startActivityForResult(intent, REQUEST_OPEN_ROM);
     }
 
     private void openSaveFolderPicker() {
@@ -199,30 +178,107 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, REQUEST_OPEN_SAVE_FOLDER);
     }
 
+    private void showRomPickerFromSaveFolder() {
+        if (selectedSaveFolderUri == null) {
+            showNotice("Folder Required", "Choose a Save / ROM folder before selecting a ROM.");
+            return;
+        }
+
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<Uri> uris = new ArrayList<>();
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                selectedSaveFolderUri,
+                DocumentsContract.getTreeDocumentId(selectedSaveFolderUri)
+        );
+
+        try (Cursor cursor = getContentResolver().query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID},
+                null,
+                null,
+                null
+        )) {
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String name = cursor.getString(0);
+                    String documentId = cursor.getString(1);
+                    if (isSupportedRomName(name)) {
+                        names.add(name);
+                        uris.add(DocumentsContract.buildDocumentUriUsingTree(selectedSaveFolderUri, documentId));
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            showNotice("ROM List Failed", t.getMessage() == null ? "Could not list selected folder." : t.getMessage());
+            return;
+        }
+
+        if (names.isEmpty()) {
+            showNotice("No ROM Found", "No .gba, .gbc, or .gb files were found in the selected folder.");
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Choose ROM")
+                .setItems(names.toArray(new String[0]), (dialog, which) -> {
+                    selectedRomUri = uris.get(which);
+                    romView.setText("Selected ROM:\n" + names.get(which));
+                    startButton.setEnabled(true);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startSelectedGame() {
+        if (selectedSaveFolderUri == null) {
+            showNotice("Folder Required", "Choose a Save / ROM folder before starting a game.");
+            return;
+        }
+        if (selectedRomUri == null) {
+            showNotice("ROM Required", "Choose a ROM from the selected folder first.");
+            return;
+        }
+        Intent intent = new Intent(this, GameActivity.class);
+        intent.setData(selectedRomUri);
+        intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
+        intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        startActivity(intent);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             return;
         }
-        if (requestCode == REQUEST_OPEN_ROM) {
-            selectedRomUri = data.getData();
-            getContentResolver().takePersistableUriPermission(
-                    selectedRomUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-            );
-            String name = getDisplayName(selectedRomUri);
-            romView.setText("Selected ROM:\n" + name);
-            Button startButton = (Button) romView.getTag();
-            startButton.setEnabled(true);
-        } else if (requestCode == REQUEST_OPEN_SAVE_FOLDER) {
+        if (requestCode == REQUEST_OPEN_SAVE_FOLDER) {
             selectedSaveFolderUri = data.getData();
             getContentResolver().takePersistableUriPermission(
                     selectedSaveFolderUri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             );
-            saveFolderView.setText("Save folder selected:\n" + selectedSaveFolderUri + "\nPortable .sav enabled");
+            selectedRomUri = null;
+            saveFolderView.setText("Folder selected:\n" + selectedSaveFolderUri + "\nROM must be selected from this folder.");
+            romView.setText("No ROM selected. Supported files in selected folder: .gba, .gb, .gbc");
+            openRomButton.setEnabled(coreLoaded);
+            startButton.setEnabled(false);
         }
+    }
+
+    private boolean isSupportedRomName(String name) {
+        if (name == null) return false;
+        String lower = name.toLowerCase();
+        return lower.endsWith(".gba") || lower.endsWith(".gbc") || lower.endsWith(".gb");
+    }
+
+    private void showNotice(String title, String message) {
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private String getDisplayName(Uri uri) {
