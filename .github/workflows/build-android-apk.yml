@@ -19,6 +19,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Apply low latency audio patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
+          text = path.read_text()
+          text = text.replace('int bufferBytes = Math.max(minBufferBytes * 2, sampleRate);', 'int bufferBytes = minBufferBytes;')
+          text = text.replace('int shortBufferSize = Math.max(2048, bufferBytes / 2);', 'int shortBufferSize = Math.max(512, bufferBytes / 4);')
+          text = text.replace('Thread.sleep(4);', 'Thread.sleep(1);')
+          text = text.replace('updateInfo(NativeBridge.getLastError());', 'updateInfo("audio low latency\\n" + NativeBridge.getLastError());')
+          path.write_text(text)
+          PY
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
