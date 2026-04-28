@@ -3,6 +3,10 @@ package com.keltic.vbam;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -23,7 +27,10 @@ public class GameActivity extends Activity {
     private TextView info;
     private ImageView screen;
     private volatile boolean running;
+    private volatile boolean audioRunning;
     private Thread frameThread;
+    private Thread audioThread;
+    private AudioTrack audioTrack;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,12 +75,14 @@ public class GameActivity extends Activity {
     @Override
     protected void onPause() {
         releaseAllButtons();
+        stopAudioPlayback();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         running = false;
+        stopAudioPlayback();
         releaseAllButtons();
         NativeBridge.unloadRom();
         super.onDestroy();
@@ -95,6 +104,7 @@ public class GameActivity extends Activity {
                 return;
             }
             updateInfo("Running...\n" + NativeBridge.getLastError());
+            startAudioPlayback();
             startFrameLoop();
         } catch (Throwable t) {
             updateInfo("ROM prepare/load failed:\n" + t.getMessage());
@@ -118,9 +128,8 @@ public class GameActivity extends Activity {
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
                     }
                     frame++;
-                    if (frame % 10 == 0) {
-                        int inputMask = NativeBridge.getInputMask();
-                        updateInfo(NativeBridge.getLastError() + "\nLIVE inputMask=" + inputMask);
+                    if (frame % 30 == 0) {
+                        updateInfo(NativeBridge.getLastError());
                     }
                 } else {
                     updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
@@ -139,6 +148,71 @@ public class GameActivity extends Activity {
             }
         }, "VBAM-frame-loop");
         frameThread.start();
+    }
+
+    private void startAudioPlayback() {
+        stopAudioPlayback();
+        int sampleRate = NativeBridge.getAudioSampleRate();
+        int channelConfig = AudioFormat.CHANNEL_OUT_STEREO;
+        int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+        int minBufferBytes = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat);
+        if (minBufferBytes <= 0) {
+            minBufferBytes = sampleRate;
+        }
+        int bufferBytes = Math.max(minBufferBytes * 2, sampleRate);
+
+        audioTrack = new AudioTrack(
+                new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                new AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setEncoding(audioFormat)
+                        .setChannelMask(channelConfig)
+                        .build(),
+                bufferBytes,
+                AudioTrack.MODE_STREAM,
+                AudioManager.AUDIO_SESSION_ID_GENERATE
+        );
+        audioTrack.play();
+
+        audioRunning = true;
+        int shortBufferSize = Math.max(2048, bufferBytes / 2);
+        audioThread = new Thread(() -> {
+            short[] buffer = new short[shortBufferSize];
+            while (audioRunning) {
+                int count = NativeBridge.readAudioSamples(buffer, buffer.length);
+                if (count > 0 && audioTrack != null) {
+                    audioTrack.write(buffer, 0, count);
+                } else {
+                    try {
+                        Thread.sleep(4);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        audioRunning = false;
+                    }
+                }
+            }
+        }, "VBAM-audio-loop");
+        audioThread.start();
+    }
+
+    private void stopAudioPlayback() {
+        audioRunning = false;
+        if (audioThread != null) {
+            audioThread.interrupt();
+            audioThread = null;
+        }
+        if (audioTrack != null) {
+            try {
+                audioTrack.pause();
+                audioTrack.flush();
+                audioTrack.release();
+            } catch (Throwable ignored) {
+            }
+            audioTrack = null;
+        }
     }
 
     private void addVirtualControls(FrameLayout root) {
@@ -207,14 +281,12 @@ public class GameActivity extends Activity {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN:
                     NativeBridge.setButtonState(button, true);
-                    updateInfo("Pressed " + label + "\nLIVE inputMask=" + NativeBridge.getInputMask());
                     v.setAlpha(1.0f);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_CANCEL:
                     NativeBridge.setButtonState(button, false);
-                    updateInfo("Released " + label + "\nLIVE inputMask=" + NativeBridge.getInputMask());
                     v.setAlpha(0.85f);
                     return true;
                 default:
