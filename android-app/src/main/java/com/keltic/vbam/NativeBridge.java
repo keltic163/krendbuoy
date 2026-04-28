@@ -1,4 +1,4 @@
-package com.keltic.vbam;
+package com.krendstudio.krendbuoy;
 
 public final class NativeBridge {
     public static final int BUTTON_A = 0;
