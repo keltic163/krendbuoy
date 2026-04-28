@@ -19,24 +19,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply low latency audio patch
+      - name: Apply selectable audio preset patch
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           game = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
           text = game.read_text()
+          text = text.replace('private AudioTrack audioTrack;\n', 'private AudioTrack audioTrack;\n    private int audioBacklogSamples = 2048;\n')
+          text = text.replace('Uri romUri = getIntent().getData();', 'Uri romUri = getIntent().getData();\n        audioBacklogSamples = getIntent().getIntExtra("audio_backlog_samples", 2048);\n        if (audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = 2048;\n        }')
+          text = text.replace('updateInfo("Running...\\n" + NativeBridge.getLastError());\n            startAudioPlayback();', 'NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            updateInfo("Running... audio preset " + audioBacklogSamples + "\\n" + NativeBridge.getLastError());\n            startAudioPlayback();')
           text = text.replace('int bufferBytes = Math.max(minBufferBytes * 2, sampleRate);', 'int bufferBytes = minBufferBytes;')
           text = text.replace('int shortBufferSize = Math.max(2048, bufferBytes / 2);', 'int shortBufferSize = Math.max(512, bufferBytes / 4);')
           text = text.replace('Thread.sleep(4);', 'Thread.sleep(1);')
-          text = text.replace('updateInfo(NativeBridge.getLastError());', 'updateInfo("audio 2048 backlog test\\n" + NativeBridge.getLastError());')
+          text = text.replace('updateInfo(NativeBridge.getLastError());', 'updateInfo("audio preset " + audioBacklogSamples + "\\n" + NativeBridge.getLastError());')
           text = text.replace('.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)\n                        .build()', '.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)\n                        .setFlags(AudioAttributes.FLAG_LOW_LATENCY)\n                        .build()')
           game.write_text(text)
 
           native = Path('android-app/src/main/cpp/native_bridge.cpp')
           text = native.read_text()
-          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static constexpr size_t MAX_AUDIO_SAMPLES = 2048;')
-          text = text.replace('size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());\n    if (count == 0) return 0;\n    env->SetShortArrayRegion(out, 0, static_cast<jsize>(count), reinterpret_cast<const jshort*>(audioBuffer.data()));\n    audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(count));', 'if (audioBuffer.size() > MAX_AUDIO_SAMPLES) {\n        audioBuffer.erase(audioBuffer.begin(), audioBuffer.end() - static_cast<long>(MAX_AUDIO_SAMPLES));\n    }\n    size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());\n    if (count == 0) return 0;\n    env->SetShortArrayRegion(out, 0, static_cast<jsize>(count), reinterpret_cast<const jshort*>(audioBuffer.data()));\n    audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(count));')
+          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static std::atomic_size_t audioMaxSamples{2048};')
+          text = text.replace('if (audioBuffer.size() + samples > MAX_AUDIO_SAMPLES) {\n        size_t overflow = audioBuffer.size() + samples - MAX_AUDIO_SAMPLES;', 'size_t maxAudioSamples = audioMaxSamples.load();\n    if (audioBuffer.size() + samples > maxAudioSamples) {\n        size_t overflow = audioBuffer.size() + samples - maxAudioSamples;')
+          text = text.replace('size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());', 'size_t maxAudioSamples = audioMaxSamples.load();\n    if (audioBuffer.size() > maxAudioSamples) {\n        audioBuffer.erase(audioBuffer.begin(), audioBuffer.end() - static_cast<long>(maxAudioSamples));\n    }\n    size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());')
+          text = text.replace('extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_readAudioSamples', 'extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setAudioMaxBufferedSamples(JNIEnv*, jclass, jint samples) {\n    if (samples != 1024 && samples != 2048 && samples != 4096) samples = 2048;\n    audioMaxSamples.store(static_cast<size_t>(samples));\n}\nextern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_readAudioSamples')
+          text = text.replace('" input=" + std::to_string(inputMask.load());', '" input=" + std::to_string(inputMask.load()) + " audioMax=" + std::to_string(audioMaxSamples.load());')
           native.write_text(text)
           PY
 
