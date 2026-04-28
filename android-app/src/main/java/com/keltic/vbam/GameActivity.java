@@ -16,6 +16,7 @@ import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -24,6 +25,7 @@ import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,12 +36,15 @@ public class GameActivity extends Activity {
     private volatile boolean running;
     private volatile boolean audioRunning;
     private volatile boolean finishingFromMenu;
+    private volatile boolean menuPaused;
     private Thread frameThread;
     private Thread audioThread;
     private AudioTrack audioTrack;
     private int audioBacklogSamples = -1;
     private Uri portableSaveFolderUri;
     private String romBaseName = "selected";
+    private int displayMode = 0;
+    private boolean debugTextVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,6 +84,7 @@ public class GameActivity extends Activity {
         info.setTextSize(12f);
         info.setTextColor(Color.DKGRAY);
         info.setGravity(Gravity.CENTER);
+        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
         content.addView(info, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -86,7 +92,7 @@ public class GameActivity extends Activity {
 
         addVirtualControls(root);
         setContentView(root);
-        new Thread(() -> prepareAndStart(romUri)).start();
+        new Thread(() -> prepareAndStart(romUri), "KrendBuoy-prepare").start();
     }
 
     @Override
@@ -149,6 +155,16 @@ public class GameActivity extends Activity {
         frameThread = new Thread(() -> {
             long frame = 0;
             while (running) {
+                if (menuPaused) {
+                    try {
+                        Thread.sleep(16);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        running = false;
+                    }
+                    continue;
+                }
+
                 long start = System.currentTimeMillis();
                 boolean ok = NativeBridge.runFrame();
                 if (ok) {
@@ -249,22 +265,249 @@ public class GameActivity extends Activity {
     }
 
     private void showQuickMenu() {
+        pauseEmulationForMenu();
         releaseAllButtons();
-        String[] items = {"Resume", "Change ROM", "Audio Preset", "Exit Game"};
+        String[] items = {"Resume", "Return to Main Menu", "Save State", "Load State", "Display Settings", "Audio Preset", "Exit Game"};
         new AlertDialog.Builder(this)
                 .setTitle("KrendBuoy Menu")
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {
+                        resumeEmulationFromMenu();
                         dialog.dismiss();
                     } else if (which == 1) {
                         leaveGame();
                     } else if (which == 2) {
-                        showAudioPresetDialog();
+                        showStateSlotDialog(true);
                     } else if (which == 3) {
+                        showStateSlotDialog(false);
+                    } else if (which == 4) {
+                        showDisplaySettingsDialog();
+                    } else if (which == 5) {
+                        showAudioPresetDialog();
+                    } else if (which == 6) {
                         leaveGame();
                     }
                 })
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
+    }
+
+    private void pauseEmulationForMenu() {
+        if (finishingFromMenu) return;
+        menuPaused = true;
+        releaseAllButtons();
+        stopAudioPlayback();
+    }
+
+    private void resumeEmulationFromMenu() {
+        if (finishingFromMenu) return;
+        if (!running) return;
+        if (!menuPaused) return;
+        menuPaused = false;
+        startAudioPlayback();
+    }
+
+    private void showStateSlotDialog(boolean save) {
+        String[] labels = {"Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"};
+        new AlertDialog.Builder(this)
+                .setTitle(save ? "Save State" : "Load State")
+                .setItems(labels, (dialog, which) -> {
+                    int slot = which + 1;
+                    if (save) {
+                        saveStateNow(slot);
+                    } else {
+                        loadStateNow(slot);
+                    }
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+    private void saveStateNow(int slot) {
+        try {
+            byte[] data = NativeBridge.exportState();
+            if (data == null || data.length == 0) {
+                showQuickNotice("Save State", "Save state failed:\n" + NativeBridge.getLastError());
+                return;
+            }
+            if (writeStateBytes(data, slot)) {
+                showQuickNotice("Save State", "Saved to Slot " + slot + "\n" + stateFileName(slot));
+            } else {
+                showQuickNotice("Save State", "Save state write failed.");
+            }
+        } catch (Throwable t) {
+            showQuickNotice("Save State", "Save state failed:\n" + t.getMessage());
+        }
+    }
+
+    private void loadStateNow(int slot) {
+        try {
+            byte[] data = readStateBytes(slot);
+            if (data == null || data.length == 0) {
+                showQuickNotice("Load State", "No save state found in Slot " + slot + ".");
+                return;
+            }
+            boolean ok = NativeBridge.importState(data);
+            if (ok) {
+                showQuickNotice("Load State", "Loaded Slot " + slot + "\n" + stateFileName(slot));
+            } else {
+                showQuickNotice("Load State", "Load state failed:\n" + NativeBridge.getLastError());
+            }
+        } catch (Throwable t) {
+            showQuickNotice("Load State", "Load state failed:\n" + t.getMessage());
+        }
+    }
+
+    private void showQuickNotice(String title, String message) {
+        updateInfo(message);
+        runOnUiThread(() -> new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .setOnDismissListener(dialog -> resumeEmulationFromMenu())
+                .show());
+    }
+
+    private String stateFileName(int slot) {
+        return sanitizeFileName(romBaseName) + ".slot" + slot + ".state";
+    }
+
+    private boolean writeStateBytes(byte[] data, int slot) throws Exception {
+        if (portableSaveFolderUri != null) {
+            Uri stateDir = getOrCreatePortableStateFolder();
+            if (stateDir == null) return false;
+            Uri target = findChildDocumentIn(stateDir, stateFileName(slot));
+            if (target == null) target = createChildDocumentIn(stateDir, stateFileName(slot), "application/octet-stream");
+            if (target == null) return false;
+            try (OutputStream output = getContentResolver().openOutputStream(target, "wt")) {
+                if (output == null) return false;
+                output.write(data);
+                output.flush();
+                return true;
+            }
+        }
+        File stateDir = new File(ensureDirectory("states"), sanitizeFileName(romBaseName));
+        if (!stateDir.exists() && !stateDir.mkdirs()) return false;
+        File outFile = new File(stateDir, stateFileName(slot));
+        try (FileOutputStream output = new FileOutputStream(outFile)) {
+            output.write(data);
+            output.flush();
+            return true;
+        }
+    }
+
+    private byte[] readStateBytes(int slot) throws Exception {
+        if (portableSaveFolderUri != null) {
+            Uri stateDir = getOrCreatePortableStateFolder();
+            if (stateDir == null) return null;
+            Uri state = findChildDocumentIn(stateDir, stateFileName(slot));
+            if (state == null) return null;
+            return readAllBytes(state);
+        }
+        File stateDir = new File(ensureDirectory("states"), sanitizeFileName(romBaseName));
+        File inFile = new File(stateDir, stateFileName(slot));
+        if (!inFile.exists()) return null;
+        try (InputStream input = new FileInputStream(inFile);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024 * 16];
+            int read;
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+            return output.toByteArray();
+        }
+    }
+
+    private Uri getOrCreatePortableStateFolder() throws Exception {
+        if (portableSaveFolderUri == null) return null;
+        Uri root = DocumentsContract.buildDocumentUriUsingTree(
+                portableSaveFolderUri,
+                DocumentsContract.getTreeDocumentId(portableSaveFolderUri)
+        );
+        Uri existing = findChildDocumentIn(root, "KrendBuoy States");
+        if (existing != null) return existing;
+        return createChildDocumentIn(root, "KrendBuoy States", DocumentsContract.Document.MIME_TYPE_DIR);
+    }
+
+    private Uri findChildDocumentIn(Uri parentDocumentUri, String fileName) {
+        if (portableSaveFolderUri == null || parentDocumentUri == null) return null;
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                portableSaveFolderUri,
+                DocumentsContract.getDocumentId(parentDocumentUri)
+        );
+        try (Cursor cursor = getContentResolver().query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID},
+                null,
+                null,
+                null
+        )) {
+            if (cursor == null) return null;
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(0);
+                String documentId = cursor.getString(1);
+                if (fileName.equals(name)) {
+                    return DocumentsContract.buildDocumentUriUsingTree(portableSaveFolderUri, documentId);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Uri createChildDocumentIn(Uri parentDocumentUri, String fileName, String mimeType) throws Exception {
+        if (parentDocumentUri == null) return null;
+        return DocumentsContract.createDocument(
+                getContentResolver(),
+                parentDocumentUri,
+                mimeType,
+                fileName
+        );
+    }
+
+    private void showDisplaySettingsDialog() {
+        String[] labels = {
+                "Fit Screen",
+                "Original Ratio",
+                "Stretch",
+                debugTextVisible ? "Hide Debug Text" : "Show Debug Text"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("Display Settings")
+                .setItems(labels, (dialog, which) -> {
+                    if (which == 0) {
+                        displayMode = 0;
+                        applyDisplayMode();
+                    } else if (which == 1) {
+                        displayMode = 1;
+                        applyDisplayMode();
+                    } else if (which == 2) {
+                        displayMode = 2;
+                        applyDisplayMode();
+                    } else if (which == 3) {
+                        debugTextVisible = !debugTextVisible;
+                        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
+                    }
+                    resumeEmulationFromMenu();
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+    private void applyDisplayMode() {
+        if (displayMode == 2) {
+            screen.setAdjustViewBounds(false);
+            screen.setScaleType(ImageView.ScaleType.FIT_XY);
+        } else {
+            screen.setAdjustViewBounds(true);
+            screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        }
+        updateInfo("Display mode: " + displayModeLabel());
+    }
+
+    private String displayModeLabel() {
+        if (displayMode == 1) return "Original Ratio";
+        if (displayMode == 2) return "Stretch";
+        return "Fit Screen";
     }
 
     private void showAudioPresetDialog() {
@@ -291,6 +534,7 @@ public class GameActivity extends Activity {
                     dialog.dismiss();
                 })
                 .setNegativeButton("Cancel", null)
+                .setOnDismissListener(dialog -> resumeEmulationFromMenu())
                 .show();
     }
 
