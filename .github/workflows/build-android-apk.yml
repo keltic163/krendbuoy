@@ -45,52 +45,56 @@ jobs:
           text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static std::atomic_int audioMode{-1};\nstatic std::atomic<size_t> audioMaxSamples{4096};')
           text = text.replace('typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);\ntypedef void (*retro_run_t)();', 'typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);\ntypedef void* (*retro_get_memory_data_t)(unsigned);\ntypedef size_t (*retro_get_memory_size_t)(unsigned);\ntypedef void (*retro_run_t)();')
           text = text.replace('static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;\nstatic retro_run_t p_retro_run = nullptr;', 'static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;\nstatic retro_get_memory_data_t p_retro_get_memory_data = nullptr;\nstatic retro_get_memory_size_t p_retro_get_memory_size = nullptr;\nstatic retro_run_t p_retro_run = nullptr;')
+
           marker = 'static uint32_t rgb565ToArgb(uint16_t p) {'
-          helper = r'''static bool writeFile(const std::string& path, const void* data, size_t size) {
-    std::ofstream f(path, std::ios::binary | std::ios::trunc);
-    if (!f) return false;
-    f.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));
-    return static_cast<bool>(f);
-}
-
-static std::string makeSramPath(const std::string& romPath) {
-    size_t pos = romPath.find_last_of('/');
-    std::string name = (pos == std::string::npos) ? romPath : romPath.substr(pos + 1);
-    if (name.empty()) name = "selected.rom";
-    return saveDir + "/" + name + ".srm";
-}
-
-static bool loadSramFromDisk() {
-    if (!p_retro_get_memory_data || !p_retro_get_memory_size || currentSavePath.empty()) return false;
-    void* data = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    size_t size = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!data || size == 0) return false;
-    std::vector<uint8_t> fileData;
-    if (!readFile(currentSavePath, fileData)) {
-        last = "No SRAM file yet: " + currentSavePath;
-        return false;
-    }
-    size_t copySize = std::min(size, fileData.size());
-    std::memcpy(data, fileData.data(), copySize);
-    last = "SRAM loaded. bytes=" + std::to_string(copySize) + " path=" + currentSavePath;
-    return true;
-}
-
-static bool saveSramToDisk() {
-    if (!loaded || !p_retro_get_memory_data || !p_retro_get_memory_size || currentSavePath.empty()) return false;
-    void* data = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    size_t size = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!data || size == 0) {
-        last = "No SRAM memory exposed by core.";
-        return false;
-    }
-    bool ok = writeFile(currentSavePath, data, size);
-    last = ok ? ("SRAM saved. bytes=" + std::to_string(size) + " path=" + currentSavePath) : ("SRAM save failed: " + currentSavePath);
-    return ok;
-}
-
-'''
+          helper = '\n'.join([
+              'static bool writeFile(const std::string& path, const void* data, size_t size) {',
+              '    std::ofstream f(path, std::ios::binary | std::ios::trunc);',
+              '    if (!f) return false;',
+              '    f.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));',
+              '    return static_cast<bool>(f);',
+              '}',
+              '',
+              'static std::string makeSramPath(const std::string& romPath) {',
+              "    size_t pos = romPath.find_last_of('/');",
+              '    std::string name = (pos == std::string::npos) ? romPath : romPath.substr(pos + 1);',
+              '    if (name.empty()) name = "selected.rom";',
+              '    return saveDir + "/" + name + ".srm";',
+              '}',
+              '',
+              'static bool loadSramFromDisk() {',
+              '    if (!p_retro_get_memory_data || !p_retro_get_memory_size || currentSavePath.empty()) return false;',
+              '    void* data = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);',
+              '    size_t size = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);',
+              '    if (!data || size == 0) return false;',
+              '    std::vector<uint8_t> fileData;',
+              '    if (!readFile(currentSavePath, fileData)) {',
+              '        last = "No SRAM file yet: " + currentSavePath;',
+              '        return false;',
+              '    }',
+              '    size_t copySize = std::min(size, fileData.size());',
+              '    std::memcpy(data, fileData.data(), copySize);',
+              '    last = "SRAM loaded. bytes=" + std::to_string(copySize) + " path=" + currentSavePath;',
+              '    return true;',
+              '}',
+              '',
+              'static bool saveSramToDisk() {',
+              '    if (!loaded || !p_retro_get_memory_data || !p_retro_get_memory_size || currentSavePath.empty()) return false;',
+              '    void* data = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);',
+              '    size_t size = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);',
+              '    if (!data || size == 0) {',
+              '        last = "No SRAM memory exposed by core.";',
+              '        return false;',
+              '    }',
+              '    bool ok = writeFile(currentSavePath, data, size);',
+              '    last = ok ? ("SRAM saved. bytes=" + std::to_string(size) + " path=" + currentSavePath) : ("SRAM save failed: " + currentSavePath);',
+              '    return ok;',
+              '}',
+              '',
+              ''
+          ])
           text = text.replace(marker, helper + marker)
+
           text = text.replace('if (audioBuffer.size() + samples > MAX_AUDIO_SAMPLES) {\n        size_t overflow = audioBuffer.size() + samples - MAX_AUDIO_SAMPLES;', 'size_t maxAudioSamples = audioMaxSamples.load();\n    if (audioMode.load() == -1 && audioBuffer.size() + samples > 4096) {\n        size_t trimTo = 2048;\n        if (audioBuffer.size() > trimTo) audioBuffer.erase(audioBuffer.begin(), audioBuffer.end() - static_cast<long>(trimTo));\n    }\n    if (audioBuffer.size() + samples > maxAudioSamples) {\n        size_t overflow = audioBuffer.size() + samples - maxAudioSamples;')
           text = text.replace('LOADSYM(retro_get_system_info); LOADSYM(retro_get_system_av_info); LOADSYM(retro_run);', 'LOADSYM(retro_get_system_info); LOADSYM(retro_get_system_av_info); LOADSYM(retro_run);\n    p_retro_get_memory_data = reinterpret_cast<retro_get_memory_data_t>(dlsym(core, "retro_get_memory_data"));\n    p_retro_get_memory_size = reinterpret_cast<retro_get_memory_size_t>(dlsym(core, "retro_get_memory_size"));')
           text = text.replace('loaded = true; p_retro_get_system_av_info(&avInfo);\n    last = "retro_load_game success.', 'loaded = true; p_retro_get_system_av_info(&avInfo);\n    currentSavePath = makeSramPath(localPath);\n    loadSramFromDisk();\n    last = "retro_load_game success.')
