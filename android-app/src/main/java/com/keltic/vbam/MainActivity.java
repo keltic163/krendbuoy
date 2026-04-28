@@ -10,6 +10,8 @@ import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
@@ -18,6 +20,7 @@ public class MainActivity extends Activity {
     private TextView statusView;
     private TextView romView;
     private Uri selectedRomUri;
+    private int selectedAudioBacklogSamples = 2048;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,8 +62,44 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        statusParams.setMargins(0, 32, 0, 32);
+        statusParams.setMargins(0, 32, 0, 24);
         root.addView(statusView, statusParams);
+
+        TextView audioTitle = new TextView(this);
+        audioTitle.setText("Audio latency preset");
+        audioTitle.setTextSize(16f);
+        audioTitle.setGravity(Gravity.CENTER);
+        root.addView(audioTitle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        RadioGroup audioGroup = new RadioGroup(this);
+        audioGroup.setOrientation(RadioGroup.VERTICAL);
+
+        RadioButton preset1024 = new RadioButton(this);
+        preset1024.setText("1024 - lowest latency, may crackle");
+        preset1024.setId(1024);
+        audioGroup.addView(preset1024);
+
+        RadioButton preset2048 = new RadioButton(this);
+        preset2048.setText("2048 - low latency");
+        preset2048.setId(2048);
+        audioGroup.addView(preset2048);
+
+        RadioButton preset4096 = new RadioButton(this);
+        preset4096.setText("4096 - balanced/stable");
+        preset4096.setId(4096);
+        audioGroup.addView(preset4096);
+
+        audioGroup.check(2048);
+        audioGroup.setOnCheckedChangeListener((group, checkedId) -> selectedAudioBacklogSamples = checkedId);
+        LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        audioParams.setMargins(0, 8, 0, 24);
+        root.addView(audioGroup, audioParams);
 
         Button openButton = new Button(this);
         openButton.setText("Choose ROM file");
@@ -89,6 +128,7 @@ public class MainActivity extends Activity {
             if (selectedRomUri != null) {
                 Intent intent = new Intent(this, GameActivity.class);
                 intent.setData(selectedRomUri);
+                intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(intent);
             }
