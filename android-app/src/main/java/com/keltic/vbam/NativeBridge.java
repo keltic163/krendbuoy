@@ -44,6 +44,10 @@ public final class NativeBridge {
 
     public static native int readAudioSamples(short[] buffer, int maxSamples);
 
+    public static native byte[] exportSram();
+
+    public static native boolean importSram(byte[] data);
+
     public static native boolean saveSram();
 
     public static native String getLastError();
