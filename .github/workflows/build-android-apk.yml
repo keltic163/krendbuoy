@@ -103,6 +103,7 @@ jobs:
           text = text.replace('extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError', 'extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_saveSram(JNIEnv*, jclass) { return saveSramToDisk() ? JNI_TRUE : JNI_FALSE; }\nextern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError')
           text = text.replace('clearButtons(); clearAudio();\n    if (loaded && p_retro_unload_game) p_retro_unload_game();', 'saveSramToDisk(); clearButtons(); clearAudio();\n    if (loaded && p_retro_unload_game) p_retro_unload_game();')
           text = text.replace('" input=" + std::to_string(inputMask.load());', '" input=" + std::to_string(inputMask.load()) + " audioMode=" + std::to_string(audioMode.load()) + " audioMax=" + std::to_string(audioMaxSamples.load());')
+          text = text.replace('Java_com_keltic_vbam_NativeBridge_', 'Java_com_krendstudio_krendbuoy_NativeBridge_')
           native.write_text(text)
           PY
 
