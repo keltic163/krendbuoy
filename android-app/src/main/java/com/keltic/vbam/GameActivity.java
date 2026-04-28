@@ -1,6 +1,8 @@
 package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -9,8 +11,8 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
-import android.database.Cursor;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
@@ -19,9 +21,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 public class GameActivity extends Activity {
     private TextView info;
@@ -31,11 +35,22 @@ public class GameActivity extends Activity {
     private Thread frameThread;
     private Thread audioThread;
     private AudioTrack audioTrack;
+    private int audioBacklogSamples = -1;
+    private Uri portableSaveFolderUri;
+    private String romBaseName = "selected";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Uri romUri = getIntent().getData();
+        audioBacklogSamples = getIntent().getIntExtra("audio_backlog_samples", -1);
+        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
+            audioBacklogSamples = -1;
+        }
+        String saveFolder = getIntent().getStringExtra("save_folder_uri");
+        if (saveFolder != null && !saveFolder.isEmpty()) {
+            portableSaveFolderUri = Uri.parse(saveFolder);
+        }
 
         FrameLayout root = new FrameLayout(this);
 
@@ -74,6 +89,8 @@ public class GameActivity extends Activity {
 
     @Override
     protected void onPause() {
+        NativeBridge.saveSram();
+        exportPortableSramIfEnabled();
         releaseAllButtons();
         stopAudioPlayback();
         super.onPause();
@@ -82,6 +99,8 @@ public class GameActivity extends Activity {
     @Override
     protected void onDestroy() {
         running = false;
+        NativeBridge.saveSram();
+        exportPortableSramIfEnabled();
         stopAudioPlayback();
         releaseAllButtons();
         NativeBridge.unloadRom();
@@ -94,6 +113,9 @@ public class GameActivity extends Activity {
             return;
         }
         try {
+            String romDisplayName = getDisplayName(romUri);
+            romBaseName = removeKnownRomExtension(romDisplayName);
+
             File localRom = copyRomToLocalFile(romUri);
             File systemDir = ensureDirectory("system");
             File saveDir = ensureDirectory("save");
@@ -103,7 +125,10 @@ public class GameActivity extends Activity {
                 updateInfo("loadRom failed:\n" + NativeBridge.getLastError());
                 return;
             }
-            updateInfo("Running...\n" + NativeBridge.getLastError());
+
+            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
+            importPortableSramIfAvailable();
+            updateInfo("Running... audio preset " + audioBacklogSamples + "\n" + NativeBridge.getLastError());
             startAudioPlayback();
             startFrameLoop();
         } catch (Throwable t) {
@@ -129,7 +154,7 @@ public class GameActivity extends Activity {
                     }
                     frame++;
                     if (frame % 30 == 0) {
-                        updateInfo(NativeBridge.getLastError());
+                        updateInfo("audio preset " + audioBacklogSamples + "\n" + NativeBridge.getLastError());
                     }
                 } else {
                     updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
@@ -157,14 +182,15 @@ public class GameActivity extends Activity {
         int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
         int minBufferBytes = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat);
         if (minBufferBytes <= 0) {
-            minBufferBytes = sampleRate;
+            minBufferBytes = Math.max(4096, sampleRate / 4);
         }
-        int bufferBytes = Math.max(minBufferBytes * 2, sampleRate);
+        int bufferBytes = minBufferBytes;
 
         audioTrack = new AudioTrack(
                 new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_GAME)
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setFlags(AudioAttributes.FLAG_LOW_LATENCY)
                         .build(),
                 new AudioFormat.Builder()
                         .setSampleRate(sampleRate)
@@ -178,7 +204,7 @@ public class GameActivity extends Activity {
         audioTrack.play();
 
         audioRunning = true;
-        int shortBufferSize = Math.max(2048, bufferBytes / 2);
+        int shortBufferSize = Math.max(512, bufferBytes / 4);
         audioThread = new Thread(() -> {
             short[] buffer = new short[shortBufferSize];
             while (audioRunning) {
@@ -187,7 +213,7 @@ public class GameActivity extends Activity {
                     audioTrack.write(buffer, 0, count);
                 } else {
                     try {
-                        Thread.sleep(4);
+                        Thread.sleep(1);
                     } catch (InterruptedException ignored) {
                         Thread.currentThread().interrupt();
                         audioRunning = false;
@@ -213,6 +239,105 @@ public class GameActivity extends Activity {
             }
             audioTrack = null;
         }
+    }
+
+    private void importPortableSramIfAvailable() {
+        if (portableSaveFolderUri == null) return;
+        try {
+            Uri sav = findChildDocument(romBaseName + ".sav");
+            Uri srm = sav != null ? sav : findChildDocument(romBaseName + ".srm");
+            if (srm == null) return;
+            byte[] data = readAllBytes(srm);
+            if (data != null && data.length > 0) {
+                boolean ok = NativeBridge.importSram(data);
+                updateInfo(ok ? "Portable save loaded: " + romBaseName : "Portable save import failed");
+            }
+        } catch (Throwable t) {
+            updateInfo("Portable save load failed:\n" + t.getMessage());
+        }
+    }
+
+    private void exportPortableSramIfEnabled() {
+        if (portableSaveFolderUri == null) return;
+        try {
+            byte[] data = NativeBridge.exportSram();
+            if (data == null || data.length == 0) return;
+            Uri target = findChildDocument(romBaseName + ".sav");
+            if (target == null) {
+                target = createChildDocument(romBaseName + ".sav");
+            }
+            if (target == null) return;
+            try (OutputStream output = getContentResolver().openOutputStream(target, "wt")) {
+                if (output != null) {
+                    output.write(data);
+                    output.flush();
+                }
+            }
+        } catch (Throwable t) {
+            updateInfo("Portable save write failed:\n" + t.getMessage());
+        }
+    }
+
+    private Uri findChildDocument(String fileName) {
+        if (portableSaveFolderUri == null) return null;
+        ContentResolver resolver = getContentResolver();
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                portableSaveFolderUri,
+                DocumentsContract.getTreeDocumentId(portableSaveFolderUri)
+        );
+        try (Cursor cursor = resolver.query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID},
+                null,
+                null,
+                null
+        )) {
+            if (cursor == null) return null;
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(0);
+                String documentId = cursor.getString(1);
+                if (fileName.equals(name)) {
+                    return DocumentsContract.buildDocumentUriUsingTree(portableSaveFolderUri, documentId);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Uri createChildDocument(String fileName) throws Exception {
+        if (portableSaveFolderUri == null) return null;
+        Uri parent = DocumentsContract.buildDocumentUriUsingTree(
+                portableSaveFolderUri,
+                DocumentsContract.getTreeDocumentId(portableSaveFolderUri)
+        );
+        return DocumentsContract.createDocument(
+                getContentResolver(),
+                parent,
+                "application/octet-stream",
+                fileName
+        );
+    }
+
+    private byte[] readAllBytes(Uri uri) throws Exception {
+        try (InputStream input = getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (input == null) return null;
+            byte[] buffer = new byte[1024 * 16];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return output.toByteArray();
+        }
+    }
+
+    private String removeKnownRomExtension(String name) {
+        if (name == null || name.isEmpty()) return "selected";
+        String lower = name.toLowerCase();
+        if (lower.endsWith(".gba")) return name.substring(0, name.length() - 4);
+        if (lower.endsWith(".gbc")) return name.substring(0, name.length() - 4);
+        if (lower.endsWith(".gb")) return name.substring(0, name.length() - 3);
+        return name;
     }
 
     private void addVirtualControls(FrameLayout root) {
