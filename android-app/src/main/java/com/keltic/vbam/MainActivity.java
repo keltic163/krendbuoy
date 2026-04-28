@@ -16,12 +16,15 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_ROM = 1001;
+    private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
     private static final int AUDIO_DYNAMIC_VALUE = -1;
     private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
 
     private TextView statusView;
     private TextView romView;
+    private TextView saveFolderView;
     private Uri selectedRomUri;
+    private Uri selectedSaveFolderUri;
     private int selectedAudioBacklogSamples = AUDIO_DYNAMIC_VALUE;
 
     @Override
@@ -110,6 +113,25 @@ public class MainActivity extends Activity {
         audioParams.setMargins(0, 8, 0, 24);
         root.addView(audioGroup, audioParams);
 
+        Button saveFolderButton = new Button(this);
+        saveFolderButton.setText("Choose Save Folder (optional)");
+        saveFolderButton.setOnClickListener(v -> openSaveFolderPicker());
+        root.addView(saveFolderButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        saveFolderView = new TextView(this);
+        saveFolderView.setText("Save folder: App private storage\nPortable .sav export disabled");
+        saveFolderView.setTextSize(14f);
+        saveFolderView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        saveParams.setMargins(0, 12, 0, 24);
+        root.addView(saveFolderView, saveParams);
+
         Button openButton = new Button(this);
         openButton.setText("Choose ROM file");
         openButton.setEnabled(coreLoaded);
@@ -138,7 +160,11 @@ public class MainActivity extends Activity {
                 Intent intent = new Intent(this, GameActivity.class);
                 intent.setData(selectedRomUri);
                 intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
+                if (selectedSaveFolderUri != null) {
+                    intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
+                }
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 startActivity(intent);
             }
         });
@@ -165,10 +191,21 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, REQUEST_OPEN_ROM);
     }
 
+    private void openSaveFolderPicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_OPEN_SAVE_FOLDER);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_OPEN_ROM && resultCode == RESULT_OK && data != null && data.getData() != null) {
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        if (requestCode == REQUEST_OPEN_ROM) {
             selectedRomUri = data.getData();
             getContentResolver().takePersistableUriPermission(
                     selectedRomUri,
@@ -178,6 +215,13 @@ public class MainActivity extends Activity {
             romView.setText("Selected ROM:\n" + name);
             Button startButton = (Button) romView.getTag();
             startButton.setEnabled(true);
+        } else if (requestCode == REQUEST_OPEN_SAVE_FOLDER) {
+            selectedSaveFolderUri = data.getData();
+            getContentResolver().takePersistableUriPermission(
+                    selectedSaveFolderUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            );
+            saveFolderView.setText("Save folder selected:\n" + selectedSaveFolderUri + "\nPortable .sav enabled");
         }
     }
 
