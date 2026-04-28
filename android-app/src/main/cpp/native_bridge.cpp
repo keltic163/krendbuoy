@@ -73,6 +73,9 @@ typedef void (*retro_get_system_info_t)(retro_system_info*);
 typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);
 typedef void* (*retro_get_memory_data_t)(unsigned);
 typedef size_t (*retro_get_memory_size_t)(unsigned);
+typedef size_t (*retro_serialize_size_t)();
+typedef bool (*retro_serialize_t)(void*, size_t);
+typedef bool (*retro_unserialize_t)(const void*, size_t);
 typedef void (*retro_run_t)();
 
 static retro_init_t p_retro_init = nullptr;
@@ -90,6 +93,9 @@ static retro_get_system_info_t p_retro_get_system_info = nullptr;
 static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;
 static retro_get_memory_data_t p_retro_get_memory_data = nullptr;
 static retro_get_memory_size_t p_retro_get_memory_size = nullptr;
+static retro_serialize_size_t p_retro_serialize_size = nullptr;
+static retro_serialize_t p_retro_serialize = nullptr;
+static retro_unserialize_t p_retro_unserialize = nullptr;
 static retro_run_t p_retro_run = nullptr;
 
 static void fail(const std::string& s) { last = s; LOGE("%s", s.c_str()); }
@@ -268,6 +274,9 @@ static bool initCore() {
     LOADSYM(retro_get_system_info); LOADSYM(retro_get_system_av_info); LOADSYM(retro_run);
     p_retro_get_memory_data = reinterpret_cast<retro_get_memory_data_t>(dlsym(core, "retro_get_memory_data"));
     p_retro_get_memory_size = reinterpret_cast<retro_get_memory_size_t>(dlsym(core, "retro_get_memory_size"));
+    p_retro_serialize_size = reinterpret_cast<retro_serialize_size_t>(dlsym(core, "retro_serialize_size"));
+    p_retro_serialize = reinterpret_cast<retro_serialize_t>(dlsym(core, "retro_serialize"));
+    p_retro_unserialize = reinterpret_cast<retro_unserialize_t>(dlsym(core, "retro_unserialize"));
     p_retro_set_controller_port_device = reinterpret_cast<retro_set_controller_port_device_t>(dlsym(core, "retro_set_controller_port_device"));
     p_retro_set_environment(envCb);
     p_retro_set_video_refresh(videoCb);
@@ -387,6 +396,27 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridg
     std::memcpy(data, buffer.data(), copySize);
     last = "SRAM imported. bytes=" + std::to_string(copySize);
     return JNI_TRUE;
+}
+extern "C" JNIEXPORT jbyteArray JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_exportState(JNIEnv* env, jclass) {
+    if (!loaded || !p_retro_serialize_size || !p_retro_serialize) { last = "Save state unavailable."; return nullptr; }
+    size_t size = p_retro_serialize_size();
+    if (size == 0) { last = "Save state size is zero."; return nullptr; }
+    std::vector<uint8_t> buffer(size);
+    if (!p_retro_serialize(buffer.data(), size)) { last = "retro_serialize failed."; return nullptr; }
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(size));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(size), reinterpret_cast<const jbyte*>(buffer.data()));
+    last = "Save state exported. bytes=" + std::to_string(size);
+    return result;
+}
+extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_importState(JNIEnv* env, jclass, jbyteArray input) {
+    if (!loaded || !input || !p_retro_unserialize) { last = "Load state unavailable."; return JNI_FALSE; }
+    jsize size = env->GetArrayLength(input);
+    if (size <= 0) { last = "Load state input is empty."; return JNI_FALSE; }
+    std::vector<jbyte> buffer(static_cast<size_t>(size));
+    env->GetByteArrayRegion(input, 0, size, buffer.data());
+    bool ok = p_retro_unserialize(buffer.data(), static_cast<size_t>(size));
+    last = ok ? ("Save state loaded. bytes=" + std::to_string(size)) : "retro_unserialize failed.";
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_saveSram(JNIEnv*, jclass) { return loaded ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jstring JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_getLastError(JNIEnv* env, jclass) { return env->NewStringUTF(last.c_str()); }
