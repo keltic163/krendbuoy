@@ -19,15 +19,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply quick menu label patch
+      - name: Apply frontend test patches
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
-          text = path.read_text()
-          text = text.replace('"Resume", "Change ROM", "Audio Preset", "Exit Game"', '"Resume", "Return to Main Menu", "Audio Preset", "Exit Game"')
-          path.write_text(text)
+
+          # Stable local debug signing for GitHub Actions test APKs.
+          gradle = Path('android-app/build.gradle')
+          text = gradle.read_text()
+          if 'storeFile file("debug.keystore")' not in text:
+              text = text.replace('    defaultConfig {', '    signingConfigs {\n        debug {\n            storeFile file("debug.keystore")\n            storePassword "android"\n            keyAlias "androiddebugkey"\n            keyPassword "android"\n        }\n    }\n\n    defaultConfig {')
+              text = text.replace('        release {', '        debug {\n            signingConfig signingConfigs.debug\n        }\n\n        release {')
+          gradle.write_text(text)
+
+          game = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
+          text = game.read_text()
+          text = text.replace('"Resume", "Change ROM", "Audio Preset", "Exit Game"', '"Resume", "Return to Main Menu", "Save State", "Load State", "Audio Preset", "Exit Game"')
+          text = text.replace('''                    } else if (which == 1) {\n                        leaveGame();\n                    } else if (which == 2) {\n                        showAudioPresetDialog();\n                    } else if (which == 3) {\n                        leaveGame();\n                    }''', '''                    } else if (which == 1) {\n                        leaveGame();\n                    } else if (which == 2) {\n                        saveStateNow();\n                    } else if (which == 3) {\n                        loadStateNow();\n                    } else if (which == 4) {\n                        showAudioPresetDialog();\n                    } else if (which == 5) {\n                        leaveGame();\n                    }''')
+          insert_after = '''    private void leaveGame() {\n        if (finishingFromMenu) return;\n        finishingFromMenu = true;\n        NativeBridge.saveSram();\n        exportPortableSramIfEnabled();\n        releaseAllButtons();\n        finish();\n    }\n'''
+          save_state_methods = '''\n    private void saveStateNow() {\n        try {\n            byte[] data = NativeBridge.exportState();\n            if (data == null || data.length == 0) {\n                updateInfo("Save state failed:\\n" + NativeBridge.getLastError());\n                return;\n            }\n            if (writeStateBytes(data)) {\n                updateInfo("Save state written: " + romBaseName + ".state");\n            } else {\n                updateInfo("Save state write failed.");\n            }\n        } catch (Throwable t) {\n            updateInfo("Save state failed:\\n" + t.getMessage());\n        }\n    }\n\n    private void loadStateNow() {\n        try {\n            byte[] data = readStateBytes();\n            if (data == null || data.length == 0) {\n                updateInfo("No save state found: " + romBaseName + ".state");\n                return;\n            }\n            boolean ok = NativeBridge.importState(data);\n            updateInfo(ok ? "Save state loaded: " + romBaseName + ".state" : "Load state failed:\\n" + NativeBridge.getLastError());\n        } catch (Throwable t) {\n            updateInfo("Load state failed:\\n" + t.getMessage());\n        }\n    }\n\n    private boolean writeStateBytes(byte[] data) throws Exception {\n        if (portableSaveFolderUri != null) {\n            Uri target = findChildDocument(romBaseName + ".state");\n            if (target == null) target = createChildDocument(romBaseName + ".state");\n            if (target == null) return false;\n            try (OutputStream output = getContentResolver().openOutputStream(target, "wt")) {\n                if (output == null) return false;\n                output.write(data);\n                output.flush();\n                return true;\n            }\n        }\n        File stateDir = ensureDirectory("states");\n        File outFile = new File(stateDir, sanitizeFileName(romBaseName) + ".state");\n        try (FileOutputStream output = new FileOutputStream(outFile)) {\n            output.write(data);\n            output.flush();\n            return true;\n        }\n    }\n\n    private byte[] readStateBytes() throws Exception {\n        if (portableSaveFolderUri != null) {\n            Uri state = findChildDocument(romBaseName + ".state");\n            if (state == null) return null;\n            return readAllBytes(state);\n        }\n        File inFile = new File(ensureDirectory("states"), sanitizeFileName(romBaseName) + ".state");\n        if (!inFile.exists()) return null;\n        try (InputStream input = new java.io.FileInputStream(inFile);\n             ByteArrayOutputStream output = new ByteArrayOutputStream()) {\n            byte[] buffer = new byte[1024 * 16];\n            int read;\n            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);\n            return output.toByteArray();\n        }\n    }\n'''
+          if 'private void saveStateNow()' not in text:
+              text = text.replace(insert_after, insert_after + save_state_methods)
+          game.write_text(text)
+
+          native = Path('android-app/src/main/cpp/native_bridge.cpp')
+          text = native.read_text()
+          if 'retro_serialize_size_t' not in text:
+              text = text.replace('typedef size_t (*retro_get_memory_size_t)(unsigned);\ntypedef void (*retro_run_t)();', 'typedef size_t (*retro_get_memory_size_t)(unsigned);\ntypedef size_t (*retro_serialize_size_t)();\ntypedef bool (*retro_serialize_t)(void*, size_t);\ntypedef bool (*retro_unserialize_t)(const void*, size_t);\ntypedef void (*retro_run_t)();')
+              text = text.replace('static retro_get_memory_size_t p_retro_get_memory_size = nullptr;\nstatic retro_run_t p_retro_run = nullptr;', 'static retro_get_memory_size_t p_retro_get_memory_size = nullptr;\nstatic retro_serialize_size_t p_retro_serialize_size = nullptr;\nstatic retro_serialize_t p_retro_serialize = nullptr;\nstatic retro_unserialize_t p_retro_unserialize = nullptr;\nstatic retro_run_t p_retro_run = nullptr;')
+              text = text.replace('p_retro_get_memory_size = reinterpret_cast<retro_get_memory_size_t>(dlsym(core, "retro_get_memory_size"));', 'p_retro_get_memory_size = reinterpret_cast<retro_get_memory_size_t>(dlsym(core, "retro_get_memory_size"));\n    p_retro_serialize_size = reinterpret_cast<retro_serialize_size_t>(dlsym(core, "retro_serialize_size"));\n    p_retro_serialize = reinterpret_cast<retro_serialize_t>(dlsym(core, "retro_serialize"));\n    p_retro_unserialize = reinterpret_cast<retro_unserialize_t>(dlsym(core, "retro_unserialize"));')
+              marker = 'extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_saveSram(JNIEnv*, jclass) { return loaded ? JNI_TRUE : JNI_FALSE; }'
+              state_jni = '''extern "C" JNIEXPORT jbyteArray JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_exportState(JNIEnv* env, jclass) {\n    if (!loaded || !p_retro_serialize_size || !p_retro_serialize) { last = "Save state unavailable."; return nullptr; }\n    size_t size = p_retro_serialize_size();\n    if (size == 0) { last = "Save state size is zero."; return nullptr; }\n    std::vector<uint8_t> buffer(size);\n    if (!p_retro_serialize(buffer.data(), size)) { last = "retro_serialize failed."; return nullptr; }\n    jbyteArray result = env->NewByteArray(static_cast<jsize>(size));\n    env->SetByteArrayRegion(result, 0, static_cast<jsize>(size), reinterpret_cast<const jbyte*>(buffer.data()));\n    last = "Save state exported. bytes=" + std::to_string(size);\n    return result;\n}\nextern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_importState(JNIEnv* env, jclass, jbyteArray input) {\n    if (!loaded || !input || !p_retro_unserialize) { last = "Load state unavailable."; return JNI_FALSE; }\n    jsize size = env->GetArrayLength(input);\n    if (size <= 0) { last = "Load state input is empty."; return JNI_FALSE; }\n    std::vector<jbyte> buffer(static_cast<size_t>(size));\n    env->GetByteArrayRegion(input, 0, size, buffer.data());\n    bool ok = p_retro_unserialize(buffer.data(), static_cast<size_t>(size));\n    last = ok ? ("Save state loaded. bytes=" + std::to_string(size)) : "retro_unserialize failed.";\n    return ok ? JNI_TRUE : JNI_FALSE;\n}\n'''
+              text = text.replace(marker, state_jni + marker)
+          native.write_text(text)
           PY
+
+      - name: Create stable debug keystore
+        run: |
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keypass android \
+            -storepass android \
+            -keystore android-app/debug.keystore \
+            -dname "CN=Android Debug,O=KrendStudio,C=TW" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
 
       - name: Setup Java
         uses: actions/setup-java@v4
