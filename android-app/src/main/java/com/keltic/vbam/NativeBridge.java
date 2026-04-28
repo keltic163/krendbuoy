@@ -48,6 +48,10 @@ public final class NativeBridge {
 
     public static native boolean importSram(byte[] data);
 
+    public static native byte[] exportState();
+
+    public static native boolean importState(byte[] data);
+
     public static native boolean saveSram();
 
     public static native String getLastError();
