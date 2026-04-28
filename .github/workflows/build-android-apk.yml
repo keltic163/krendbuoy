@@ -29,13 +29,13 @@ jobs:
           text = text.replace('int bufferBytes = Math.max(minBufferBytes * 2, sampleRate);', 'int bufferBytes = minBufferBytes;')
           text = text.replace('int shortBufferSize = Math.max(2048, bufferBytes / 2);', 'int shortBufferSize = Math.max(512, bufferBytes / 4);')
           text = text.replace('Thread.sleep(4);', 'Thread.sleep(1);')
-          text = text.replace('updateInfo(NativeBridge.getLastError());', 'updateInfo("audio low latency trimmed\\n" + NativeBridge.getLastError());')
+          text = text.replace('updateInfo(NativeBridge.getLastError());', 'updateInfo("audio 2048 backlog test\\n" + NativeBridge.getLastError());')
           text = text.replace('.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)\n                        .build()', '.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)\n                        .setFlags(AudioAttributes.FLAG_LOW_LATENCY)\n                        .build()')
           game.write_text(text)
 
           native = Path('android-app/src/main/cpp/native_bridge.cpp')
           text = native.read_text()
-          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static constexpr size_t MAX_AUDIO_SAMPLES = 4096;')
+          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static constexpr size_t MAX_AUDIO_SAMPLES = 2048;')
           text = text.replace('size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());\n    if (count == 0) return 0;\n    env->SetShortArrayRegion(out, 0, static_cast<jsize>(count), reinterpret_cast<const jshort*>(audioBuffer.data()));\n    audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(count));', 'if (audioBuffer.size() > MAX_AUDIO_SAMPLES) {\n        audioBuffer.erase(audioBuffer.begin(), audioBuffer.end() - static_cast<long>(MAX_AUDIO_SAMPLES));\n    }\n    size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());\n    if (count == 0) return 0;\n    env->SetShortArrayRegion(out, 0, static_cast<jsize>(count), reinterpret_cast<const jshort*>(audioBuffer.data()));\n    audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(count));')
           native.write_text(text)
           PY
