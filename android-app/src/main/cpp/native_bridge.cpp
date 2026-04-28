@@ -25,6 +25,7 @@ static retro_system_info sysInfo = {};
 static retro_system_av_info avInfo = {};
 static uint64_t frames = 0;
 static uint64_t videoFrames = 0;
+static uint64_t audioFrames = 0;
 static unsigned lastW = 0;
 static unsigned lastH = 0;
 static size_t lastPitch = 0;
@@ -32,6 +33,8 @@ static std::mutex frameMutex;
 static std::vector<uint32_t> framePixels;
 static int frameWidth = 0;
 static int frameHeight = 0;
+static std::mutex audioMutex;
+static std::vector<int16_t> audioBuffer;
 static std::atomic_bool buttonStates[10];
 static std::atomic_uint inputMask{0};
 static std::atomic_uint inputQueryCount{0};
@@ -47,6 +50,8 @@ static constexpr int BTN_LEFT = 6;
 static constexpr int BTN_RIGHT = 7;
 static constexpr int BTN_L = 8;
 static constexpr int BTN_R = 9;
+static constexpr size_t MAX_AUDIO_SAMPLES = 32768;
+static constexpr int FALLBACK_SAMPLE_RATE = 32768;
 
 #define LOADSYM(name) do { p_##name = reinterpret_cast<name##_t>(dlsym(core, #name)); if (!p_##name) { fail(std::string("Missing symbol: ") + #name); return false; } } while (0)
 
@@ -127,6 +132,17 @@ static unsigned buildRetroJoypadMask() {
     return mask;
 }
 
+static void appendAudioSamples(const int16_t* data, size_t samples) {
+    if (!data || samples == 0) return;
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (audioBuffer.size() + samples > MAX_AUDIO_SAMPLES) {
+        size_t overflow = audioBuffer.size() + samples - MAX_AUDIO_SAMPLES;
+        if (overflow >= audioBuffer.size()) audioBuffer.clear();
+        else audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(overflow));
+    }
+    audioBuffer.insert(audioBuffer.end(), data, data + samples);
+}
+
 static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!data || !w || !h) return;
     videoFrames++;
@@ -148,8 +164,18 @@ static void videoCb(const void* data, unsigned w, unsigned h, size_t pitch) {
     }
 }
 
-static void audioCb(int16_t, int16_t) {}
-static size_t audioBatchCb(const int16_t*, size_t n) { return n; }
+static void audioCb(int16_t left, int16_t right) {
+    int16_t pair[2] = {left, right};
+    appendAudioSamples(pair, 2);
+    audioFrames++;
+}
+
+static size_t audioBatchCb(const int16_t* data, size_t framesCount) {
+    appendAudioSamples(data, framesCount * 2);
+    audioFrames += framesCount;
+    return framesCount;
+}
+
 static void inputPollCb() {}
 static int16_t inputStateCb(unsigned port, unsigned device, unsigned, unsigned id) {
     if (port != 0 || device != RETRO_DEVICE_JOYPAD) return 0;
@@ -173,6 +199,11 @@ static int16_t inputStateCb(unsigned port, unsigned device, unsigned, unsigned i
 static void clearButtons() {
     for (auto& buttonState : buttonStates) buttonState.store(false);
     inputMask.store(0);
+}
+
+static void clearAudio() {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    audioBuffer.clear();
 }
 
 static bool envCb(unsigned cmd, void* data) {
@@ -253,20 +284,20 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_loadRom(
     if (systemDir.empty() || saveDir.empty()) { fail("loadRom failed: directories not set"); return JNI_FALSE; }
     if (!initCore()) return JNI_FALSE;
     if (loaded) { p_retro_unload_game(); loaded = false; }
-    frames = videoFrames = 0; lastW = lastH = 0; lastPitch = 0; inputQueryCount.store(0); clearButtons();
+    frames = videoFrames = audioFrames = 0; lastW = lastH = 0; lastPitch = 0; inputQueryCount.store(0); clearButtons(); clearAudio();
     { std::lock_guard<std::mutex> lock(frameMutex); framePixels.clear(); frameWidth = 0; frameHeight = 0; }
     retro_game_info game = {}; game.path = localPath.c_str();
     bool ok = p_retro_load_game(&game);
     if (!ok && readFile(localPath, romData)) { game.data = romData.data(); game.size = romData.size(); ok = p_retro_load_game(&game); }
     if (!ok) { fail("retro_load_game failed. path=" + localPath); return JNI_FALSE; }
     loaded = true; p_retro_get_system_av_info(&avInfo);
-    last = "retro_load_game success. geometry=" + std::to_string(avInfo.geometry.base_width) + "x" + std::to_string(avInfo.geometry.base_height) + ". romBytes=" + std::to_string(romData.size()) + ". controllerDeviceSet=" + std::to_string(controllerDeviceSet.load());
+    last = "retro_load_game success. geometry=" + std::to_string(avInfo.geometry.base_width) + "x" + std::to_string(avInfo.geometry.base_height) + ". sampleRate=" + std::to_string(static_cast<int>(avInfo.timing.sample_rate));
     return JNI_TRUE;
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_keltic_vbam_NativeBridge_runFrame(JNIEnv*, jclass) {
     if (!loaded || !p_retro_run) { fail("runFrame failed: game not loaded"); return JNI_FALSE; }
     p_retro_run(); frames++;
-    last = "retro_run success. frames=" + std::to_string(frames) + ". videoCallbacks=" + std::to_string(videoFrames) + ". lastVideo=" + std::to_string(lastW) + "x" + std::to_string(lastH) + ". pitch=" + std::to_string(lastPitch) + ". inputMask=" + std::to_string(inputMask.load()) + ". inputQueries=" + std::to_string(inputQueryCount.load()) + ". controllerDeviceSet=" + std::to_string(controllerDeviceSet.load());
+    last = "frames=" + std::to_string(frames) + " video=" + std::to_string(videoFrames) + " audio=" + std::to_string(audioFrames) + " input=" + std::to_string(inputMask.load());
     return JNI_TRUE;
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getFrameWidth(JNIEnv*, jclass) { std::lock_guard<std::mutex> lock(frameMutex); return frameWidth; }
@@ -287,8 +318,23 @@ extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_setButtonSta
     while (!inputMask.compare_exchange_weak(current, down ? (current | bit) : (current & ~bit))) {}
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getInputMask(JNIEnv*, jclass) { return static_cast<jint>(inputMask.load()); }
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_getAudioSampleRate(JNIEnv*, jclass) {
+    int rate = static_cast<int>(avInfo.timing.sample_rate);
+    return rate > 0 ? rate : FALLBACK_SAMPLE_RATE;
+}
+extern "C" JNIEXPORT jint JNICALL Java_com_keltic_vbam_NativeBridge_readAudioSamples(JNIEnv* env, jclass, jshortArray out, jint maxSamples) {
+    if (!out || maxSamples <= 0) return 0;
+    std::lock_guard<std::mutex> lock(audioMutex);
+    jsize capacity = env->GetArrayLength(out);
+    size_t count = std::min(static_cast<size_t>(std::min(maxSamples, capacity)), audioBuffer.size());
+    if (count == 0) return 0;
+    env->SetShortArrayRegion(out, 0, static_cast<jsize>(count), reinterpret_cast<const jshort*>(audioBuffer.data()));
+    audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + static_cast<long>(count));
+    return static_cast<jint>(count);
+}
 extern "C" JNIEXPORT jstring JNICALL Java_com_keltic_vbam_NativeBridge_getLastError(JNIEnv* env, jclass) { return env->NewStringUTF(last.c_str()); }
 extern "C" JNIEXPORT void JNICALL Java_com_keltic_vbam_NativeBridge_unloadRom(JNIEnv*, jclass) {
-    clearButtons(); if (loaded && p_retro_unload_game) p_retro_unload_game();
+    clearButtons(); clearAudio();
+    if (loaded && p_retro_unload_game) p_retro_unload_game();
     loaded = false; romData.clear(); last = "ROM unloaded.";
 }
