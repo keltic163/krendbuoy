@@ -1,4 +1,4 @@
-package com.keltic.vbam;
+package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -48,7 +48,7 @@ public class MainActivity extends Activity {
         ));
 
         TextView title = new TextView(this);
-        title.setText("VBA-M Android");
+        title.setText("KrendBuoy");
         title.setTextSize(28f);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(
