@@ -40,6 +40,8 @@ public final class NativeBridge {
 
     public static native int getAudioSampleRate();
 
+    public static native void setAudioMaxBufferedSamples(int samples);
+
     public static native int readAudioSamples(short[] buffer, int maxSamples);
 
     public static native String getLastError();
