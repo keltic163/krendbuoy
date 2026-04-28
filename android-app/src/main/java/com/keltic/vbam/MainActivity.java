@@ -98,11 +98,6 @@ public class MainActivity extends Activity {
         preset4096.setId(4096);
         audioGroup.addView(preset4096);
 
-        RadioButton preset8192 = new RadioButton(this);
-        preset8192.setText("8192 - stable audio");
-        preset8192.setId(8192);
-        audioGroup.addView(preset8192);
-
         audioGroup.check(AUDIO_DYNAMIC);
         audioGroup.setOnCheckedChangeListener((group, checkedId) -> selectedAudioBacklogSamples = checkedId);
         LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(
