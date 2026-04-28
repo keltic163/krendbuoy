@@ -40,9 +40,9 @@ jobs:
 
           native = Path('android-app/src/main/cpp/native_bridge.cpp')
           text = native.read_text()
-          text = text.replace('#include <cstdarg>\n', '#include <cstdarg>\n#include <cstring>\n')
+          text = text.replace('#include <cstdarg>\n', '#include <cstdarg>\n#include <algorithm>\n#include <cstring>\n')
           text = text.replace('static std::vector<uint8_t> romData;\n', 'static std::vector<uint8_t> romData;\nstatic std::string currentSavePath;\n')
-          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static std::atomic_int audioMode{-1};\nstatic std::atomic_size_t audioMaxSamples{4096};')
+          text = text.replace('static constexpr size_t MAX_AUDIO_SAMPLES = 32768;', 'static std::atomic_int audioMode{-1};\nstatic std::atomic<size_t> audioMaxSamples{4096};')
           text = text.replace('typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);\ntypedef void (*retro_run_t)();', 'typedef void (*retro_get_system_av_info_t)(retro_system_av_info*);\ntypedef void* (*retro_get_memory_data_t)(unsigned);\ntypedef size_t (*retro_get_memory_size_t)(unsigned);\ntypedef void (*retro_run_t)();')
           text = text.replace('static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;\nstatic retro_run_t p_retro_run = nullptr;', 'static retro_get_system_av_info_t p_retro_get_system_av_info = nullptr;\nstatic retro_get_memory_data_t p_retro_get_memory_data = nullptr;\nstatic retro_get_memory_size_t p_retro_get_memory_size = nullptr;\nstatic retro_run_t p_retro_run = nullptr;')
           marker = 'static uint32_t rgb565ToArgb(uint16_t p) {'
@@ -54,7 +54,7 @@ jobs:
 }
 
 static std::string makeSramPath(const std::string& romPath) {
-    size_t pos = romPath.find_last_of("/\\");
+    size_t pos = romPath.find_last_of('/');
     std::string name = (pos == std::string::npos) ? romPath : romPath.substr(pos + 1);
     if (name.empty()) name = "selected.rom";
     return saveDir + "/" + name + ".srm";
