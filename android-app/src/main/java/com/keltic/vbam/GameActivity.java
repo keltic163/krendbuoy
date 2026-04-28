@@ -1,4 +1,4 @@
-package com.keltic.vbam;
+package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
