@@ -16,12 +16,13 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_ROM = 1001;
-    private static final int AUDIO_DYNAMIC = -1;
+    private static final int AUDIO_DYNAMIC_VALUE = -1;
+    private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
 
     private TextView statusView;
     private TextView romView;
     private Uri selectedRomUri;
-    private int selectedAudioBacklogSamples = AUDIO_DYNAMIC;
+    private int selectedAudioBacklogSamples = AUDIO_DYNAMIC_VALUE;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,7 +81,7 @@ public class MainActivity extends Activity {
 
         RadioButton presetDynamic = new RadioButton(this);
         presetDynamic.setText("Dynamic - recommended");
-        presetDynamic.setId(AUDIO_DYNAMIC);
+        presetDynamic.setId(AUDIO_DYNAMIC_VIEW_ID);
         audioGroup.addView(presetDynamic);
 
         RadioButton preset1024 = new RadioButton(this);
@@ -98,8 +99,10 @@ public class MainActivity extends Activity {
         preset4096.setId(4096);
         audioGroup.addView(preset4096);
 
-        audioGroup.check(AUDIO_DYNAMIC);
-        audioGroup.setOnCheckedChangeListener((group, checkedId) -> selectedAudioBacklogSamples = checkedId);
+        audioGroup.check(AUDIO_DYNAMIC_VIEW_ID);
+        audioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            selectedAudioBacklogSamples = checkedId == AUDIO_DYNAMIC_VIEW_ID ? AUDIO_DYNAMIC_VALUE : checkedId;
+        });
         LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
