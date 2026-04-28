@@ -38,6 +38,10 @@ public final class NativeBridge {
 
     public static native int getInputMask();
 
+    public static native int getAudioSampleRate();
+
+    public static native int readAudioSamples(short[] buffer, int maxSamples);
+
     public static native String getLastError();
 
     public static native void unloadRom();
