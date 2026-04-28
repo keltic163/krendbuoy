@@ -16,11 +16,12 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_ROM = 1001;
+    private static final int AUDIO_DYNAMIC = -1;
 
     private TextView statusView;
     private TextView romView;
     private Uri selectedRomUri;
-    private int selectedAudioBacklogSamples = 2048;
+    private int selectedAudioBacklogSamples = AUDIO_DYNAMIC;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,8 +78,13 @@ public class MainActivity extends Activity {
         RadioGroup audioGroup = new RadioGroup(this);
         audioGroup.setOrientation(RadioGroup.VERTICAL);
 
+        RadioButton presetDynamic = new RadioButton(this);
+        presetDynamic.setText("Dynamic - recommended");
+        presetDynamic.setId(AUDIO_DYNAMIC);
+        audioGroup.addView(presetDynamic);
+
         RadioButton preset1024 = new RadioButton(this);
-        preset1024.setText("1024 - lowest latency, may crackle");
+        preset1024.setText("1024 - ultra low latency, may crackle");
         preset1024.setId(1024);
         audioGroup.addView(preset1024);
 
@@ -88,11 +94,16 @@ public class MainActivity extends Activity {
         audioGroup.addView(preset2048);
 
         RadioButton preset4096 = new RadioButton(this);
-        preset4096.setText("4096 - balanced/stable");
+        preset4096.setText("4096 - balanced");
         preset4096.setId(4096);
         audioGroup.addView(preset4096);
 
-        audioGroup.check(2048);
+        RadioButton preset8192 = new RadioButton(this);
+        preset8192.setText("8192 - stable audio");
+        preset8192.setId(8192);
+        audioGroup.addView(preset8192);
+
+        audioGroup.check(AUDIO_DYNAMIC);
         audioGroup.setOnCheckedChangeListener((group, checkedId) -> selectedAudioBacklogSamples = checkedId);
         LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
