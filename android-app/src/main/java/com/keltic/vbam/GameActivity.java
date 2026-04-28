@@ -1,6 +1,7 @@
 package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentResolver;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -32,6 +33,7 @@ public class GameActivity extends Activity {
     private ImageView screen;
     private volatile boolean running;
     private volatile boolean audioRunning;
+    private volatile boolean finishingFromMenu;
     private Thread frameThread;
     private Thread audioThread;
     private AudioTrack audioTrack;
@@ -107,6 +109,11 @@ public class GameActivity extends Activity {
         super.onDestroy();
     }
 
+    @Override
+    public void onBackPressed() {
+        showQuickMenu();
+    }
+
     private void prepareAndStart(Uri romUri) {
         if (romUri == null) {
             updateInfo("No ROM URI received.");
@@ -128,7 +135,7 @@ public class GameActivity extends Activity {
 
             NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
             importPortableSramIfAvailable();
-            updateInfo("Running... audio preset " + audioBacklogSamples + "\n" + NativeBridge.getLastError());
+            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
             startAudioPlayback();
             startFrameLoop();
         } catch (Throwable t) {
@@ -154,7 +161,7 @@ public class GameActivity extends Activity {
                     }
                     frame++;
                     if (frame % 30 == 0) {
-                        updateInfo("audio preset " + audioBacklogSamples + "\n" + NativeBridge.getLastError());
+                        updateInfo("audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
                     }
                 } else {
                     updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
@@ -239,6 +246,68 @@ public class GameActivity extends Activity {
             }
             audioTrack = null;
         }
+    }
+
+    private void showQuickMenu() {
+        releaseAllButtons();
+        String[] items = {"Resume", "Change ROM", "Audio Preset", "Exit Game"};
+        new AlertDialog.Builder(this)
+                .setTitle("KrendBuoy Menu")
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        dialog.dismiss();
+                    } else if (which == 1) {
+                        leaveGame();
+                    } else if (which == 2) {
+                        showAudioPresetDialog();
+                    } else if (which == 3) {
+                        leaveGame();
+                    }
+                })
+                .show();
+    }
+
+    private void showAudioPresetDialog() {
+        String[] labels = {
+                "Dynamic - recommended",
+                "1024 - ultra low latency, may crackle",
+                "2048 - low latency",
+                "4096 - balanced"
+        };
+        int[] values = {-1, 1024, 2048, 4096};
+        int checked = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == audioBacklogSamples) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Audio Preset")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    audioBacklogSamples = values[which];
+                    NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
+                    updateInfo("audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void leaveGame() {
+        if (finishingFromMenu) return;
+        finishingFromMenu = true;
+        NativeBridge.saveSram();
+        exportPortableSramIfEnabled();
+        releaseAllButtons();
+        finish();
+    }
+
+    private String audioPresetLabel(int value) {
+        if (value == 1024) return "1024";
+        if (value == 2048) return "2048";
+        if (value == 4096) return "4096";
+        return "Dynamic";
     }
 
     private void importPortableSramIfAvailable() {
@@ -358,6 +427,9 @@ public class GameActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
+        addSystemControl(controls, "Menu", menuWidth, menuHeight,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, margin, this::showQuickMenu);
+
         addControl(controls, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
                 Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad + keySize * 2 + gap * 2);
         addControl(controls, "←", NativeBridge.BUTTON_LEFT, keySize, keySize,
@@ -381,6 +453,16 @@ public class GameActivity extends Activity {
                 Gravity.BOTTOM | Gravity.LEFT, dp(168), dp(8));
         addControl(controls, "Start", NativeBridge.BUTTON_START, menuWidth, menuHeight,
                 Gravity.BOTTOM | Gravity.RIGHT, dp(168), dp(8));
+    }
+
+    private void addSystemControl(FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
+        TextView view = makeSystemButton(label, action);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
+        if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
+        else if ((gravity & Gravity.LEFT) == Gravity.LEFT) lp.leftMargin = horizontalMargin;
+        if ((gravity & Gravity.TOP) == Gravity.TOP) lp.topMargin = verticalMargin;
+        else lp.bottomMargin = verticalMargin;
+        parent.addView(view, lp);
     }
 
     private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {
@@ -418,6 +500,18 @@ public class GameActivity extends Activity {
                     return true;
             }
         });
+        return view;
+    }
+
+    private TextView makeSystemButton(String label, Runnable action) {
+        TextView view = new TextView(this);
+        view.setText(label);
+        view.setTextSize(13f);
+        view.setTextColor(Color.WHITE);
+        view.setGravity(Gravity.CENTER);
+        view.setBackgroundColor(0xAA333333);
+        view.setAlpha(0.85f);
+        view.setOnClickListener(v -> action.run());
         return view;
     }
 
