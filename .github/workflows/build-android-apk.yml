@@ -31,7 +31,6 @@ jobs:
           path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
           text = path.read_text()
 
-          # L/R layout patch
           if 'int shoulderBottomPad = dp(660);' not in text:
               text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(88);\n        int shoulderBottomPad = dp(660);')
           old_lr = '        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));'
@@ -41,7 +40,6 @@ jobs:
           elif new_lr not in text:
               raise SystemExit('Expected L/R layout block not found')
 
-          # Startup load state slot patch
           if 'private int startupLoadStateSlot = 0;' not in text:
               text = text.replace(
                   '    private int displayMode = 0;\n    private boolean debugTextVisible = false;',
@@ -83,7 +81,6 @@ jobs:
                   raise SystemExit('loadStateNow marker not found')
               text = text.replace(marker, method + marker)
 
-          # Save state overwrite confirmation patch
           old_save = '                    if (save) {\n                        saveStateNow(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
           new_save = '                    if (save) {\n                        confirmAndSaveState(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
           if old_save in text:
@@ -122,92 +119,18 @@ jobs:
           missing = [item for item in required if item not in text]
           if missing:
               raise SystemExit('Source consolidation incomplete: ' + ', '.join(missing))
-
           path.write_text(text)
           PY
 
-      - name: Replace workflow with clean build workflow
-        run: |
-          cat > .github/workflows/build-android-apk.yml <<'YAML'
-          name: build-android-apk
-
-          on:
-            workflow_dispatch:
-            push:
-              paths:
-                - 'android-app/**'
-                - 'build.gradle'
-                - 'settings.gradle'
-                - '.github/workflows/build-android-apk.yml'
-                - 'scripts/build-android-libretro.sh'
-                - 'src/libretro/**'
-                - 'src/core/**'
-
-          jobs:
-            build:
-              runs-on: ubuntu-latest
-              steps:
-                - name: Checkout
-                  uses: actions/checkout@v4
-
-                - name: Create stable debug keystore
-                  run: |
-                    keytool -genkeypair \
-                      -alias androiddebugkey \
-                      -keypass android \
-                      -storepass android \
-                      -keystore android-app/debug.keystore \
-                      -dname "CN=Android Debug,O=KrendStudio,C=TW" \
-                      -keyalg RSA \
-                      -keysize 2048 \
-                      -validity 10000
-
-                - name: Setup Java
-                  uses: actions/setup-java@v4
-                  with:
-                    distribution: temurin
-                    java-version: '17'
-
-                - name: Setup Android SDK
-                  uses: android-actions/setup-android@v3
-
-                - name: Install NDK
-                  run: |
-                    sdkmanager --install "ndk;26.3.11579264" "platforms;android-34" "build-tools;34.0.0"
-                    echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.3.11579264" >> $GITHUB_ENV
-
-                - name: Build native core
-                  run: |
-                    chmod +x scripts/build-android-libretro.sh
-                    scripts/build-android-libretro.sh arm64-v8a
-
-                - name: Prepare JNI libs
-                  run: |
-                    mkdir -p android-app/src/main/jniLibs/arm64-v8a
-                    cp build/android/arm64-v8a/vbam_libretro.so android-app/src/main/jniLibs/arm64-v8a/libvbam_libretro.so
-                    cp "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" android-app/src/main/jniLibs/arm64-v8a/libc++_shared.so
-                    ls -la android-app/src/main/jniLibs/arm64-v8a
-
-                - name: Build APK
-                  run: |
-                    gradle :android-app:assembleDebug
-
-                - name: Upload APK
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: vbam-android-debug-apk
-                    path: android-app/build/outputs/apk/debug/*.apk
-          YAML
-
-      - name: Commit source consolidation
+      - name: Commit GameActivity consolidation
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add android-app/src/main/java/com/keltic/vbam/GameActivity.java .github/workflows/build-android-apk.yml
+          git add android-app/src/main/java/com/keltic/vbam/GameActivity.java
           if git diff --cached --quiet; then
-            echo "No consolidation changes to commit."
+            echo "No GameActivity consolidation changes to commit."
           else
-            git commit -m "Consolidate GameActivity patches and clean workflow"
+            git commit -m "Consolidate GameActivity patches into source"
             git push
           fi
 
