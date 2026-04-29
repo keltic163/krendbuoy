@@ -35,6 +35,64 @@ jobs:
           path.write_text(text)
           PY
 
+      - name: Apply startup save state slot patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
+          text = path.read_text()
+
+          if 'private int startupLoadStateSlot = 0;' not in text:
+              text = text.replace('    private int displayMode = 0;\n    private boolean debugTextVisible = false;', '    private int displayMode = 0;\n    private boolean debugTextVisible = false;\n    private int startupLoadStateSlot = 0;')
+
+          if 'startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);' not in text:
+              text = text.replace('''        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
+            audioBacklogSamples = -1;
+        }
+        String saveFolder = getIntent().getStringExtra("save_folder_uri");''', '''        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
+            audioBacklogSamples = -1;
+        }
+        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
+        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {
+            startupLoadStateSlot = 0;
+        }
+        String saveFolder = getIntent().getStringExtra("save_folder_uri");''')
+
+          if 'loadStartupStateIfRequested();' not in text:
+              text = text.replace('''            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
+            importPortableSramIfAvailable();
+            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());''', '''            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
+            importPortableSramIfAvailable();
+            loadStartupStateIfRequested();
+            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());''')
+
+          if 'private void loadStartupStateIfRequested()' not in text:
+              marker = '    private void loadStateNow(int slot) {'
+              method = '''    private void loadStartupStateIfRequested() {
+        if (startupLoadStateSlot <= 0) return;
+        int slot = startupLoadStateSlot;
+        startupLoadStateSlot = 0;
+        try {
+            byte[] data = readStateBytes(slot);
+            if (data == null || data.length == 0) {
+                updateInfo("Startup save state not found: Slot " + slot);
+                return;
+            }
+            boolean ok = NativeBridge.importState(data);
+            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\\n" + NativeBridge.getLastError());
+        } catch (Throwable t) {
+            updateInfo("Startup load state failed:\\n" + t.getMessage());
+        }
+    }
+
+'''
+              if marker not in text:
+                  raise SystemExit('loadStateNow marker not found')
+              text = text.replace(marker, method + marker)
+
+          path.write_text(text)
+          PY
+
       - name: Create stable debug keystore
         run: |
           keytool -genkeypair \
