@@ -45,22 +45,32 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         portableSaveManager = new PortableSaveManager(this, portableSaveFolderUri, this);
 
         FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(18, 22, 26));
+
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(8), dp(4), dp(8), dp(176));
+        content.setPadding(dp(8), dp(62), dp(8), 0);
         root.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        int screenWidth = getResources().getDisplayMetrics().widthPixels - dp(16);
+        int screenHeight = Math.round(screenWidth * 2f / 3f);
+        screenHeight = Math.max(dp(220), Math.min(screenHeight, dp(360)));
+
+        FrameLayout screenBox = new FrameLayout(this);
+        screenBox.setBackgroundColor(Color.BLACK);
+        content.addView(screenBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, screenHeight));
+
         screen = new ImageView(this);
-        screen.setAdjustViewBounds(true);
+        screen.setAdjustViewBounds(false);
         screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        content.addView(screen, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        screenBox.addView(screen, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         frameLoopManager = new FrameLoopManager(this, screen);
 
         info = new TextView(this);
         info.setText("Preparing ROM...");
         info.setTextSize(12f);
-        info.setTextColor(Color.DKGRAY);
+        info.setTextColor(Color.LTGRAY);
         info.setGravity(Gravity.CENTER);
         info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
         content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
