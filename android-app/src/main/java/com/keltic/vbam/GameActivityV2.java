@@ -16,8 +16,10 @@ import android.widget.TextView;
 public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host, FrameLoopManager.Host, PortableSaveManager.Host {
     private TextView info;
     private ImageView screen;
+    private Uri currentRomUri;
     private volatile boolean finishingFromMenu;
     private volatile boolean menuPaused;
+    private volatile boolean restarting;
     private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
     private RomSessionManager romSessionManager;
@@ -33,7 +35,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Uri romUri = getIntent().getData();
+        currentRomUri = getIntent().getData();
         romSessionManager = new RomSessionManager(this);
         audioBacklogSamples = normalizeAudioPreset(getIntent().getIntExtra("audio_backlog_samples", -1));
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
@@ -65,7 +67,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
         GameControllerOverlay.attach(this, root, this);
         setContentView(root);
-        new Thread(() -> prepareAndStart(romUri), "KrendBuoy-prepare-v2").start();
+        new Thread(() -> prepareAndStart(currentRomUri), "KrendBuoy-prepare-v2").start();
     }
 
     @Override
@@ -106,6 +108,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         importPortableSramIfAvailable();
         loadStartupStateIfRequested();
         updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+        menuPaused = false;
+        restarting = false;
         startAudioPlayback();
         startFrameLoop();
     }
@@ -130,7 +134,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void pauseEmulationForMenu() {
-        if (finishingFromMenu) return;
+        if (finishingFromMenu || restarting) return;
         menuPaused = true;
         releaseAllButtons();
         stopAudioPlayback();
@@ -138,7 +142,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void resumeEmulationFromMenu() {
-        if (finishingFromMenu || frameLoopManager == null || !frameLoopManager.isRunning() || !menuPaused) return;
+        if (finishingFromMenu || restarting || frameLoopManager == null || !frameLoopManager.isRunning() || !menuPaused) return;
         menuPaused = false;
         startAudioPlayback();
     }
@@ -179,7 +183,22 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void restartGame() {
-        showUnavailableFeature("Restart Game", "Restart will be added after GameActivityV2 is verified.");
+        if (restarting || currentRomUri == null) return;
+        restarting = true;
+        updateInfo("Restarting game...");
+        new Thread(() -> {
+            menuPaused = true;
+            NativeBridge.saveSram();
+            exportPortableSramIfEnabled();
+            releaseAllButtons();
+            stopAudioPlayback();
+            if (frameLoopManager != null) frameLoopManager.stop();
+            NativeBridge.unloadRom();
+            saveStateManager = null;
+            startupLoadStateSlot = 0;
+            frameLoopManager = new FrameLoopManager(this, screen);
+            prepareAndStart(currentRomUri);
+        }, "KrendBuoy-restart-v2").start();
     }
 
     @Override
