@@ -3,7 +3,6 @@ package com.krendstudio.krendbuoy;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -23,13 +22,12 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host {
+public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host, FrameLoopManager.Host {
     private TextView info;
     private ImageView screen;
-    private volatile boolean running;
     private volatile boolean finishingFromMenu;
     private volatile boolean menuPaused;
-    private Thread frameThread;
+    private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
     private int audioBacklogSamples = -1;
     private Uri portableSaveFolderUri;
@@ -60,6 +58,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         screen.setAdjustViewBounds(true);
         screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
         content.addView(screen, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        frameLoopManager = new FrameLoopManager(this, screen);
 
         info = new TextView(this);
         info.setText("Preparing ROM...");
@@ -85,7 +84,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     protected void onDestroy() {
-        running = false;
+        if (frameLoopManager != null) frameLoopManager.stop();
         NativeBridge.saveSram();
         exportPortableSramIfEnabled();
         stopAudioPlayback();
@@ -127,34 +126,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void startFrameLoop() {
-        if (running) return;
-        running = true;
-        frameThread = new Thread(() -> {
-            long frame = 0;
-            while (running) {
-                if (menuPaused) {
-                    sleepQuietly(16);
-                    continue;
-                }
-                long start = System.currentTimeMillis();
-                if (NativeBridge.runFrame()) {
-                    int width = NativeBridge.getFrameWidth();
-                    int height = NativeBridge.getFrameHeight();
-                    int[] pixels = NativeBridge.copyFramePixels();
-                    if (width > 0 && height > 0 && pixels != null && pixels.length == width * height) {
-                        Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
-                        runOnUiThread(() -> screen.setImageBitmap(bitmap));
-                    }
-                    if (++frame % 30 == 0) updateInfo("audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
-                } else {
-                    updateInfo("runFrame failed:\n" + NativeBridge.getLastError());
-                    running = false;
-                }
-                long sleep = 16L - (System.currentTimeMillis() - start);
-                if (sleep > 0) sleepQuietly(sleep);
-            }
-        }, "VBAM-frame-loop-v2");
-        frameThread.start();
+        if (frameLoopManager == null) frameLoopManager = new FrameLoopManager(this, screen);
+        frameLoopManager.start();
     }
 
     private void startAudioPlayback() {
@@ -180,9 +153,24 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void resumeEmulationFromMenu() {
-        if (finishingFromMenu || !running || !menuPaused) return;
+        if (finishingFromMenu || frameLoopManager == null || !frameLoopManager.isRunning() || !menuPaused) return;
         menuPaused = false;
         startAudioPlayback();
+    }
+
+    @Override
+    public boolean isFrameLoopPaused() {
+        return menuPaused;
+    }
+
+    @Override
+    public void updateFrameInfo(String text) {
+        updateInfo(text);
+    }
+
+    @Override
+    public String audioPresetLabelForFrameLoop() {
+        return audioPresetLabel(audioBacklogSamples);
     }
 
     @Override
@@ -459,14 +447,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         runOnUiThread(() -> {
             if (info != null) info.setText(text);
         });
-    }
-
-    private void sleepQuietly(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     @Override
