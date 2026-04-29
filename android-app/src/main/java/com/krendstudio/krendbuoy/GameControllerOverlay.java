@@ -8,11 +8,6 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-/**
- * Builds the in-game controller overlay.
- * The first version mirrors the current GameActivity controls. Future layout
- * customization should live here rather than inside GameActivity.
- */
 final class GameControllerOverlay {
     interface Host {
         void showQuickMenu();
@@ -31,17 +26,17 @@ final class GameControllerOverlay {
     }
 
     static void attach(Activity activity, FrameLayout root, Host host) {
-        int keySize = host.dp(58);
-        int shoulderWidth = host.dp(76);
-        int shoulderHeight = host.dp(42);
+        int keySize = host.dp(62);
+        int shoulderWidth = host.dp(84);
+        int shoulderHeight = host.dp(44);
         int menuWidth = host.dp(88);
         int menuHeight = host.dp(38);
-        int startSelectWidth = host.dp(96);
-        int startSelectHeight = host.dp(40);
-        int margin = host.dp(16);
-        int gap = host.dp(8);
-        int bottomPad = host.dp(88);
-        int shoulderBottomPad = host.dp(660);
+        int startSelectWidth = host.dp(76);
+        int startSelectHeight = host.dp(34);
+        int margin = host.dp(20);
+        int gap = host.dp(10);
+        int bottomBarTop = host.dp(58);
+        int dpadBottom = host.dp(116);
 
         FrameLayout controls = new FrameLayout(activity);
         controls.setClipChildren(false);
@@ -58,27 +53,27 @@ final class GameControllerOverlay {
         addSystemControl(activity, controls, "Menu", menuWidth, menuHeight,
                 Gravity.TOP | Gravity.RIGHT, margin, host.dp(8), host::showQuickMenu);
 
+        addControl(activity, controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
+                Gravity.BOTTOM | Gravity.LEFT, host.dp(235), host.dp(360));
+        addControl(activity, controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
+                Gravity.BOTTOM | Gravity.RIGHT, host.dp(235), host.dp(360));
+
         addControl(activity, controls, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad + keySize * 2 + gap * 2);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, dpadBottom + keySize + gap);
         addControl(activity, controls, "←", NativeBridge.BUTTON_LEFT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin, bottomPad + keySize + gap);
+                Gravity.BOTTOM | Gravity.LEFT, margin, dpadBottom);
         addControl(activity, controls, "→", NativeBridge.BUTTON_RIGHT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, bottomPad + keySize + gap);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, dpadBottom);
         addControl(activity, controls, "↓", NativeBridge.BUTTON_DOWN, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad);
+                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, dpadBottom - keySize - gap);
 
         addControl(activity, controls, "B", NativeBridge.BUTTON_B, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap, bottomPad + keySize + gap);
+                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap + host.dp(26), dpadBottom - host.dp(10));
         addControl(activity, controls, "A", NativeBridge.BUTTON_A, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin, bottomPad + keySize * 2 + gap * 2);
+                Gravity.BOTTOM | Gravity.RIGHT, margin, dpadBottom + keySize - host.dp(8));
 
-        addControl(activity, controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
-                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);
-        addControl(activity, controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
-                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);
-
-        addCenteredControl(activity, controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, host.dp(18), -host.dp(72));
-        addCenteredControl(activity, controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, host.dp(18), host.dp(72));
+        addCenteredControl(activity, controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, bottomBarTop + host.dp(12), -host.dp(48));
+        addCenteredControl(activity, controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, bottomBarTop + host.dp(12), host.dp(48));
 
         addSystemControl(activity, controls, "Controller", host.dp(112), host.dp(44),
                 Gravity.BOTTOM | Gravity.LEFT, margin, host.dp(4), host::showControllerSettingsDialog);
@@ -149,6 +144,12 @@ final class GameControllerOverlay {
                 case MotionEvent.ACTION_POINTER_DOWN:
                     NativeBridge.setButtonState(button, true);
                     v.setAlpha(1.0f);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    boolean inside = event.getX() >= 0 && event.getX() <= v.getWidth()
+                            && event.getY() >= 0 && event.getY() <= v.getHeight();
+                    NativeBridge.setButtonState(button, inside);
+                    v.setAlpha(inside ? 1.0f : 0.85f);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
