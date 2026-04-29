@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
 
     private static class RomEntry {
         String name;
+        String baseName;
         Uri uri;
         boolean hasSav;
         int stateCount;
@@ -338,10 +339,10 @@ public class MainActivity extends Activity {
                     if (isSupportedRomName(name)) {
                         RomEntry entry = new RomEntry();
                         entry.name = name;
+                        entry.baseName = removeKnownRomExtension(name);
                         entry.uri = DocumentsContract.buildDocumentUriUsingTree(selectedSaveFolderUri, documentId);
-                        String base = removeKnownRomExtension(name);
-                        entry.hasSav = hasRootSaveFile(base);
-                        entry.stateCount = countStateFiles(base);
+                        entry.hasSav = hasRootSaveFile(entry.baseName);
+                        entry.stateCount = countStateFiles(entry.baseName);
                         entries.add(entry);
                     }
                 }
@@ -359,7 +360,11 @@ public class MainActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(12), dp(14), dp(12));
         card.setBackground(makeRoundRect(Color.rgb(25, 36, 58), dp(10)));
-        card.setOnClickListener(v -> startGame(entry.uri));
+        card.setOnClickListener(v -> startGame(entry.uri, 0));
+        card.setOnLongClickListener(v -> {
+            showRomActions(entry);
+            return true;
+        });
 
         TextView name = new TextView(this);
         name.setText(entry.name);
@@ -377,6 +382,51 @@ public class MainActivity extends Activity {
         card.addView(chips);
 
         return card;
+    }
+
+    private void showRomActions(RomEntry entry) {
+        String[] items = {"Launch Game", "Load State Slot", "Show File Info", "Refresh Status"};
+        new AlertDialog.Builder(this)
+                .setTitle(entry.name)
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        startGame(entry.uri, 0);
+                    } else if (which == 1) {
+                        showLoadStateSlotDialog(entry);
+                    } else if (which == 2) {
+                        showRomFileInfo(entry);
+                    } else if (which == 3) {
+                        refreshRomList();
+                    }
+                })
+                .show();
+    }
+
+    private void showLoadStateSlotDialog(RomEntry entry) {
+        String[] labels = new String[5];
+        for (int slot = 1; slot <= 5; slot++) {
+            labels[slot - 1] = stateSlotExists(entry.baseName, slot) ? "Slot " + slot + " - Available" : "Slot " + slot + " - Empty";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Load State Slot")
+                .setItems(labels, (dialog, which) -> {
+                    int slot = which + 1;
+                    if (!stateSlotExists(entry.baseName, slot)) {
+                        showNotice("Load State", "No save state found in Slot " + slot + ".");
+                        return;
+                    }
+                    startGame(entry.uri, slot);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showRomFileInfo(RomEntry entry) {
+        String info = entry.name
+                + "\n\nSAV: " + (entry.hasSav ? "FOUND" : "MISSING")
+                + "\nSTATE: " + entry.stateCount
+                + "\nFolder: " + displayFolderPath(selectedSaveFolderUri);
+        showNotice("File Info", info);
     }
 
     private TextView chip(String text, boolean positive) {
@@ -401,14 +451,18 @@ public class MainActivity extends Activity {
     }
 
     private int countStateFiles(String baseName) {
-        Uri stateDir = findRootChild(STATE_FOLDER_NAME);
-        if (stateDir == null) return 0;
         int count = 0;
         for (int slot = 1; slot <= 5; slot++) {
-            String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
-            if (findChildIn(stateDir, fileName) != null) count++;
+            if (stateSlotExists(baseName, slot)) count++;
         }
         return count;
+    }
+
+    private boolean stateSlotExists(String baseName, int slot) {
+        Uri stateDir = findRootChild(STATE_FOLDER_NAME);
+        if (stateDir == null) return false;
+        String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
+        return findChildIn(stateDir, fileName) != null;
     }
 
     private Uri findRootChild(String fileName) {
@@ -446,7 +500,7 @@ public class MainActivity extends Activity {
         return null;
     }
 
-    private void startGame(Uri romUri) {
+    private void startGame(Uri romUri, int loadStateSlot) {
         if (!coreLoaded) {
             showNotice("Core Unavailable", coreStatus);
             return;
@@ -459,6 +513,7 @@ public class MainActivity extends Activity {
         intent.setData(romUri);
         intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
         intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
+        intent.putExtra("load_state_slot", loadStateSlot);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         startActivity(intent);
