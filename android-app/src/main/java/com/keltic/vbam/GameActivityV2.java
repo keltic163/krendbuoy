@@ -7,7 +7,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
-import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,8 +16,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -29,6 +26,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private volatile boolean menuPaused;
     private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
+    private RomSessionManager romSessionManager;
     private int audioBacklogSamples = -1;
     private Uri portableSaveFolderUri;
     private String romBaseName = "selected";
@@ -41,6 +39,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Uri romUri = getIntent().getData();
+        romSessionManager = new RomSessionManager(this);
         audioBacklogSamples = normalizeAudioPreset(getIntent().getIntExtra("audio_backlog_samples", -1));
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) startupLoadStateSlot = 0;
@@ -99,30 +98,20 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void prepareAndStart(Uri romUri) {
-        if (romUri == null) {
-            updateInfo("No ROM URI received.");
+        if (romSessionManager == null) romSessionManager = new RomSessionManager(this);
+        RomSessionManager.Result result = romSessionManager.load(romUri);
+        if (!result.loaded) {
+            updateInfo(result.errorMessage);
             return;
         }
-        try {
-            String romDisplayName = getDisplayName(romUri);
-            romBaseName = removeKnownRomExtension(romDisplayName);
-            saveStateManager = new SaveStateManager(this, portableSaveFolderUri, ensureDirectory("states"), romBaseName);
-
-            File localRom = copyRomToLocalFile(romUri);
-            NativeBridge.setDirectories(ensureDirectory("system").getAbsolutePath(), ensureDirectory("save").getAbsolutePath());
-            if (!NativeBridge.loadRom(localRom.getAbsolutePath())) {
-                updateInfo("loadRom failed:\n" + NativeBridge.getLastError());
-                return;
-            }
-            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
-            importPortableSramIfAvailable();
-            loadStartupStateIfRequested();
-            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
-            startAudioPlayback();
-            startFrameLoop();
-        } catch (Throwable t) {
-            updateInfo("ROM prepare/load failed:\n" + t.getMessage());
-        }
+        romBaseName = result.romBaseName;
+        saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
+        NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
+        importPortableSramIfAvailable();
+        loadStartupStateIfRequested();
+        updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+        startAudioPlayback();
+        startFrameLoop();
     }
 
     private void startFrameLoop() {
@@ -204,7 +193,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void showStateSlotDialog(boolean save) {
-        if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, ensureDirectory("states"), romBaseName);
+        if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
         String[] labels = new String[5];
         for (int i = 0; i < labels.length; i++) labels[i] = saveStateManager.slotLabel(i + 1);
         new AlertDialog.Builder(this)
@@ -407,40 +396,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
             return output.toByteArray();
         }
-    }
-
-    private File copyRomToLocalFile(Uri uri) throws Exception {
-        File target = new File(getCacheDir(), "selected-rom-" + System.currentTimeMillis());
-        try (InputStream input = getContentResolver().openInputStream(uri); FileOutputStream output = new FileOutputStream(target)) {
-            if (input == null) throw new IllegalStateException("Unable to open ROM input stream");
-            byte[] buffer = new byte[16384];
-            int read;
-            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-        }
-        return target;
-    }
-
-    private String getDisplayName(Uri uri) {
-        try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) return cursor.getString(0);
-        } catch (Throwable ignored) {
-        }
-        String path = uri.getLastPathSegment();
-        return path == null || path.isEmpty() ? "selected" : path;
-    }
-
-    private String removeKnownRomExtension(String name) {
-        if (name == null || name.isEmpty()) return "selected";
-        String lower = name.toLowerCase();
-        if (lower.endsWith(".gba") || lower.endsWith(".gbc")) return name.substring(0, name.length() - 4);
-        if (lower.endsWith(".gb")) return name.substring(0, name.length() - 3);
-        return name;
-    }
-
-    private File ensureDirectory(String name) {
-        File dir = new File(getFilesDir(), name);
-        if (!dir.exists()) dir.mkdirs();
-        return dir;
     }
 
     private void updateInfo(String text) {
