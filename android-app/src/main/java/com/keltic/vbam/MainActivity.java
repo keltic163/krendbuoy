@@ -3,171 +3,286 @@ package com.krendstudio.krendbuoy;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
-import android.provider.OpenableColumns;
-import android.database.Cursor;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
     private static final int AUDIO_DYNAMIC_VALUE = -1;
     private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
+    private static final String PREFS = "krendbuoy_prefs";
+    private static final String KEY_FOLDER_URI = "folder_uri";
+    private static final String KEY_AUDIO_PRESET = "audio_preset";
+    private static final String STATE_FOLDER_NAME = "KrendBuoy States";
 
-    private TextView statusView;
-    private TextView romView;
-    private TextView saveFolderView;
-    private Button openRomButton;
-    private Button startButton;
-    private Uri selectedRomUri;
+    private SharedPreferences prefs;
+    private LinearLayout root;
+    private LinearLayout topBar;
+    private FrameLayout pageContainer;
+    private LinearLayout gamesPage;
+    private LinearLayout settingsPage;
+    private LinearLayout romList;
+    private TextView folderPathView;
+    private TextView emptyView;
+    private Button gamesTab;
+    private Button settingsTab;
     private Uri selectedSaveFolderUri;
     private int selectedAudioBacklogSamples = AUDIO_DYNAMIC_VALUE;
     private boolean coreLoaded;
+    private String coreStatus;
+
+    private static class RomEntry {
+        String name;
+        Uri uri;
+        boolean hasSav;
+        int stateCount;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        selectedAudioBacklogSamples = prefs.getInt(KEY_AUDIO_PRESET, AUDIO_DYNAMIC_VALUE);
+        String savedFolder = prefs.getString(KEY_FOLDER_URI, null);
+        if (savedFolder != null && !savedFolder.isEmpty()) {
+            selectedSaveFolderUri = Uri.parse(savedFolder);
+        }
 
+        checkCoreStatus();
+        buildRootUi();
+        showGamesPage();
+        refreshRomList();
+    }
+
+    private void checkCoreStatus() {
         coreLoaded = false;
-        String status;
         try {
             System.loadLibrary("vbam_libretro");
             coreLoaded = true;
-            status = "Core loaded successfully";
+            coreStatus = "Core loaded successfully";
         } catch (Throwable t) {
-            status = "Core library load failed: " + t.getMessage();
+            coreStatus = "Core library load failed: " + t.getMessage();
         }
+    }
 
-        LinearLayout root = new LinearLayout(this);
+    private void buildRootUi() {
+        root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(48, 96, 48, 48);
+        root.setBackgroundColor(Color.rgb(18, 24, 34));
         root.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
+        buildTopBar();
+        root.addView(topBar);
+
+        pageContainer = new FrameLayout(this);
+        root.addView(pageContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+        ));
+
+        buildGamesPage();
+        buildSettingsPage();
+
+        buildBottomTabs();
+        setContentView(root);
+    }
+
+    private void buildTopBar() {
+        topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(dp(16), dp(12), dp(16), dp(10));
+        topBar.setBackgroundColor(Color.rgb(22, 31, 46));
+
         TextView title = new TextView(this);
         title.setText("KrendBuoy");
-        title.setTextSize(28f);
-        title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(22f);
+        topBar.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button refresh = new Button(this);
+        refresh.setText("Refresh");
+        refresh.setOnClickListener(v -> refreshRomList());
+        topBar.addView(refresh, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    private void buildGamesPage() {
+        ScrollView scroll = new ScrollView(this);
+        gamesPage = new LinearLayout(this);
+        gamesPage.setOrientation(LinearLayout.VERTICAL);
+        gamesPage.setPadding(dp(12), dp(12), dp(12), dp(12));
+        scroll.addView(gamesPage, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        statusView = new TextView(this);
-        statusView.setText(status);
-        statusView.setTextSize(16f);
-        statusView.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        statusParams.setMargins(0, 32, 0, 24);
-        root.addView(statusView, statusParams);
+        LinearLayout folderCard = new LinearLayout(this);
+        folderCard.setOrientation(LinearLayout.VERTICAL);
+        folderCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+        folderCard.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(10)));
+        gamesPage.addView(folderCard, blockParams(0, 0, 0, 12));
 
-        TextView audioTitle = new TextView(this);
-        audioTitle.setText("Audio latency preset");
-        audioTitle.setTextSize(16f);
-        audioTitle.setGravity(Gravity.CENTER);
-        root.addView(audioTitle, new LinearLayout.LayoutParams(
+        LinearLayout folderHeader = new LinearLayout(this);
+        folderHeader.setOrientation(LinearLayout.HORIZONTAL);
+        folderHeader.setGravity(Gravity.CENTER_VERTICAL);
+        folderCard.addView(folderHeader);
+
+        LinearLayout folderTextBox = new LinearLayout(this);
+        folderTextBox.setOrientation(LinearLayout.VERTICAL);
+        folderHeader.addView(folderTextBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView folderTitle = new TextView(this);
+        folderTitle.setText("Folder Control");
+        folderTitle.setTextColor(Color.WHITE);
+        folderTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        folderTitle.setTextSize(18f);
+        folderTextBox.addView(folderTitle);
+
+        folderPathView = new TextView(this);
+        folderPathView.setTextColor(Color.rgb(205, 213, 225));
+        folderPathView.setTextSize(14f);
+        folderTextBox.addView(folderPathView);
+
+        Button changeFolder = new Button(this);
+        changeFolder.setText("Change Folder");
+        changeFolder.setOnClickListener(v -> openSaveFolderPicker());
+        folderHeader.addView(changeFolder, new LinearLayout.LayoutParams(dp(144), ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        emptyView = new TextView(this);
+        emptyView.setTextColor(Color.rgb(205, 213, 225));
+        emptyView.setTextSize(15f);
+        emptyView.setGravity(Gravity.CENTER);
+        emptyView.setPadding(dp(12), dp(32), dp(12), dp(32));
+        gamesPage.addView(emptyView, blockParams(0, 0, 0, 12));
+
+        romList = new LinearLayout(this);
+        romList.setOrientation(LinearLayout.VERTICAL);
+        gamesPage.addView(romList, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+
+        pageContainer.addView(scroll, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+    }
+
+    private void buildSettingsPage() {
+        ScrollView scroll = new ScrollView(this);
+        settingsPage = new LinearLayout(this);
+        settingsPage.setOrientation(LinearLayout.VERTICAL);
+        settingsPage.setPadding(dp(16), dp(16), dp(16), dp(16));
+        scroll.addView(settingsPage, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        TextView audioTitle = sectionTitle("Audio Preset");
+        settingsPage.addView(audioTitle);
 
         RadioGroup audioGroup = new RadioGroup(this);
         audioGroup.setOrientation(RadioGroup.VERTICAL);
+        audioGroup.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(10)));
+        audioGroup.setPadding(dp(12), dp(8), dp(12), dp(8));
 
-        RadioButton presetDynamic = new RadioButton(this);
-        presetDynamic.setText("Dynamic - recommended");
-        presetDynamic.setId(AUDIO_DYNAMIC_VIEW_ID);
-        audioGroup.addView(presetDynamic);
-
-        RadioButton preset1024 = new RadioButton(this);
-        preset1024.setText("1024 - ultra low latency, may crackle");
-        preset1024.setId(1024);
-        audioGroup.addView(preset1024);
-
-        RadioButton preset2048 = new RadioButton(this);
-        preset2048.setText("2048 - low latency");
-        preset2048.setId(2048);
-        audioGroup.addView(preset2048);
-
-        RadioButton preset4096 = new RadioButton(this);
-        preset4096.setText("4096 - balanced");
-        preset4096.setId(4096);
-        audioGroup.addView(preset4096);
-
-        audioGroup.check(AUDIO_DYNAMIC_VIEW_ID);
+        addAudioOption(audioGroup, AUDIO_DYNAMIC_VIEW_ID, "Dynamic - recommended");
+        addAudioOption(audioGroup, 1024, "1024 - ultra low latency, may crackle");
+        addAudioOption(audioGroup, 2048, "2048 - low latency");
+        addAudioOption(audioGroup, 4096, "4096 - balanced");
+        audioGroup.check(selectedAudioBacklogSamples == AUDIO_DYNAMIC_VALUE ? AUDIO_DYNAMIC_VIEW_ID : selectedAudioBacklogSamples);
         audioGroup.setOnCheckedChangeListener((group, checkedId) -> {
             selectedAudioBacklogSamples = checkedId == AUDIO_DYNAMIC_VIEW_ID ? AUDIO_DYNAMIC_VALUE : checkedId;
+            prefs.edit().putInt(KEY_AUDIO_PRESET, selectedAudioBacklogSamples).apply();
         });
-        LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        audioParams.setMargins(0, 8, 0, 24);
-        root.addView(audioGroup, audioParams);
+        settingsPage.addView(audioGroup, blockParams(0, 8, 0, 24));
 
-        Button saveFolderButton = new Button(this);
-        saveFolderButton.setText("Choose Save / ROM Folder");
-        saveFolderButton.setOnClickListener(v -> openSaveFolderPicker());
-        root.addView(saveFolderButton, new LinearLayout.LayoutParams(
+        TextView statusTitle = sectionTitle("Core Status");
+        settingsPage.addView(statusTitle);
+        TextView core = bodyCard(coreStatus);
+        settingsPage.addView(core, blockParams(0, 8, 0, 24));
+
+        TextView aboutTitle = sectionTitle("About");
+        settingsPage.addView(aboutTitle);
+        TextView about = bodyCard("KrendBuoy Android test build\nPortable .sav and multi-slot save states are stored in the selected folder.");
+        settingsPage.addView(about, blockParams(0, 8, 0, 24));
+
+        scroll.setVisibility(View.GONE);
+        pageContainer.addView(scroll, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                ViewGroup.LayoutParams.MATCH_PARENT
         ));
+        settingsPage.setTag(scroll);
+    }
 
-        saveFolderView = new TextView(this);
-        saveFolderView.setText("No folder selected. Choose a folder before selecting ROM.");
-        saveFolderView.setTextSize(14f);
-        saveFolderView.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        saveParams.setMargins(0, 12, 0, 24);
-        root.addView(saveFolderView, saveParams);
+    private void buildBottomTabs() {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(dp(12), dp(8), dp(12), dp(8));
+        tabs.setBackgroundColor(Color.rgb(14, 20, 30));
 
-        openRomButton = new Button(this);
-        openRomButton.setText("Choose ROM from selected folder");
-        openRomButton.setEnabled(false);
-        openRomButton.setOnClickListener(v -> showRomPickerFromSaveFolder());
-        root.addView(openRomButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+        gamesTab = new Button(this);
+        gamesTab.setText("Games");
+        gamesTab.setOnClickListener(v -> showGamesPage());
+        tabs.addView(gamesTab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        romView = new TextView(this);
-        romView.setText("No ROM selected. Supported files in selected folder: .gba, .gb, .gbc");
-        romView.setTextSize(15f);
-        romView.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams romParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        romParams.setMargins(0, 32, 0, 32);
-        root.addView(romView, romParams);
+        settingsTab = new Button(this);
+        settingsTab.setText("Settings");
+        settingsTab.setOnClickListener(v -> showSettingsPage());
+        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        startButton = new Button(this);
-        startButton.setText("Start Game");
-        startButton.setEnabled(false);
-        startButton.setOnClickListener(v -> startSelectedGame());
-        root.addView(startButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+        root.addView(tabs);
+    }
 
-        setContentView(root);
+    private void addAudioOption(RadioGroup group, int id, String label) {
+        RadioButton button = new RadioButton(this);
+        button.setId(id);
+        button.setText(label);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(15f);
+        group.addView(button);
+    }
+
+    private void showGamesPage() {
+        if (pageContainer == null) return;
+        for (int i = 0; i < pageContainer.getChildCount(); i++) {
+            pageContainer.getChildAt(i).setVisibility(i == 0 ? View.VISIBLE : View.GONE);
+        }
+        if (gamesTab != null) gamesTab.setEnabled(false);
+        if (settingsTab != null) settingsTab.setEnabled(true);
+    }
+
+    private void showSettingsPage() {
+        for (int i = 0; i < pageContainer.getChildCount(); i++) {
+            pageContainer.getChildAt(i).setVisibility(i == 1 ? View.VISIBLE : View.GONE);
+        }
+        gamesTab.setEnabled(true);
+        settingsTab.setEnabled(false);
     }
 
     private void openSaveFolderPicker() {
@@ -178,14 +293,32 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, REQUEST_OPEN_SAVE_FOLDER);
     }
 
-    private void showRomPickerFromSaveFolder() {
+    private void refreshRomList() {
+        if (folderPathView == null || romList == null || emptyView == null) return;
+        romList.removeAllViews();
         if (selectedSaveFolderUri == null) {
-            showNotice("Folder Required", "Choose a Save / ROM folder before selecting a ROM.");
+            folderPathView.setText("No folder selected");
+            emptyView.setVisibility(View.VISIBLE);
+            emptyView.setText("Choose a Save / ROM folder first. ROM files must be inside that folder.");
             return;
         }
 
-        ArrayList<String> names = new ArrayList<>();
-        ArrayList<Uri> uris = new ArrayList<>();
+        folderPathView.setText(displayFolderPath(selectedSaveFolderUri));
+        ArrayList<RomEntry> entries = scanRomEntries();
+        if (entries.isEmpty()) {
+            emptyView.setVisibility(View.VISIBLE);
+            emptyView.setText("No .gba, .gbc, or .gb files found in this folder.");
+            return;
+        }
+
+        emptyView.setVisibility(View.GONE);
+        for (RomEntry entry : entries) {
+            romList.addView(makeRomCard(entry), blockParams(0, 0, 0, 10));
+        }
+    }
+
+    private ArrayList<RomEntry> scanRomEntries() {
+        ArrayList<RomEntry> entries = new ArrayList<>();
         Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
                 selectedSaveFolderUri,
                 DocumentsContract.getTreeDocumentId(selectedSaveFolderUri)
@@ -203,48 +336,138 @@ public class MainActivity extends Activity {
                     String name = cursor.getString(0);
                     String documentId = cursor.getString(1);
                     if (isSupportedRomName(name)) {
-                        names.add(name);
-                        uris.add(DocumentsContract.buildDocumentUriUsingTree(selectedSaveFolderUri, documentId));
+                        RomEntry entry = new RomEntry();
+                        entry.name = name;
+                        entry.uri = DocumentsContract.buildDocumentUriUsingTree(selectedSaveFolderUri, documentId);
+                        String base = removeKnownRomExtension(name);
+                        entry.hasSav = hasRootSaveFile(base);
+                        entry.stateCount = countStateFiles(base);
+                        entries.add(entry);
                     }
                 }
             }
         } catch (Throwable t) {
             showNotice("ROM List Failed", t.getMessage() == null ? "Could not list selected folder." : t.getMessage());
-            return;
         }
 
-        if (names.isEmpty()) {
-            showNotice("No ROM Found", "No .gba, .gbc, or .gb files were found in the selected folder.");
-            return;
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Choose ROM")
-                .setItems(names.toArray(new String[0]), (dialog, which) -> {
-                    selectedRomUri = uris.get(which);
-                    romView.setText("Selected ROM:\n" + names.get(which));
-                    startButton.setEnabled(true);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        Collections.sort(entries, Comparator.comparing(a -> a.name.toLowerCase()));
+        return entries;
     }
 
-    private void startSelectedGame() {
+    private View makeRomCard(RomEntry entry) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(makeRoundRect(Color.rgb(25, 36, 58), dp(10)));
+        card.setOnClickListener(v -> startGame(entry.uri));
+
+        TextView name = new TextView(this);
+        name.setText(entry.name);
+        name.setTextColor(Color.WHITE);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextSize(18f);
+        card.addView(name);
+
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        chips.setGravity(Gravity.LEFT);
+        chips.setPadding(0, dp(8), 0, 0);
+        chips.addView(chip(entry.hasSav ? "SAV FOUND" : "NO SAV", entry.hasSav));
+        chips.addView(chip(entry.stateCount > 0 ? "STATE x" + entry.stateCount : "NO STATE", entry.stateCount > 0));
+        card.addView(chips);
+
+        return card;
+    }
+
+    private TextView chip(String text, boolean positive) {
+        TextView chip = new TextView(this);
+        chip.setText(text);
+        chip.setTextColor(Color.WHITE);
+        chip.setTextSize(12f);
+        chip.setTypeface(Typeface.DEFAULT_BOLD);
+        chip.setPadding(dp(8), dp(3), dp(8), dp(3));
+        chip.setBackground(makeRoundRect(positive ? Color.rgb(46, 125, 50) : Color.rgb(95, 101, 112), dp(6)));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        lp.setMargins(0, 0, dp(8), 0);
+        chip.setLayoutParams(lp);
+        return chip;
+    }
+
+    private boolean hasRootSaveFile(String baseName) {
+        return findRootChild(baseName + ".sav") != null || findRootChild(baseName + ".srm") != null;
+    }
+
+    private int countStateFiles(String baseName) {
+        Uri stateDir = findRootChild(STATE_FOLDER_NAME);
+        if (stateDir == null) return 0;
+        int count = 0;
+        for (int slot = 1; slot <= 5; slot++) {
+            String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
+            if (findChildIn(stateDir, fileName) != null) count++;
+        }
+        return count;
+    }
+
+    private Uri findRootChild(String fileName) {
+        if (selectedSaveFolderUri == null) return null;
+        Uri root = DocumentsContract.buildDocumentUriUsingTree(
+                selectedSaveFolderUri,
+                DocumentsContract.getTreeDocumentId(selectedSaveFolderUri)
+        );
+        return findChildIn(root, fileName);
+    }
+
+    private Uri findChildIn(Uri parentDocumentUri, String fileName) {
+        if (selectedSaveFolderUri == null || parentDocumentUri == null) return null;
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                selectedSaveFolderUri,
+                DocumentsContract.getDocumentId(parentDocumentUri)
+        );
+        try (Cursor cursor = getContentResolver().query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID},
+                null,
+                null,
+                null
+        )) {
+            if (cursor == null) return null;
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(0);
+                String documentId = cursor.getString(1);
+                if (fileName.equals(name)) {
+                    return DocumentsContract.buildDocumentUriUsingTree(selectedSaveFolderUri, documentId);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private void startGame(Uri romUri) {
+        if (!coreLoaded) {
+            showNotice("Core Unavailable", coreStatus);
+            return;
+        }
         if (selectedSaveFolderUri == null) {
             showNotice("Folder Required", "Choose a Save / ROM folder before starting a game.");
             return;
         }
-        if (selectedRomUri == null) {
-            showNotice("ROM Required", "Choose a ROM from the selected folder first.");
-            return;
-        }
         Intent intent = new Intent(this, GameActivity.class);
-        intent.setData(selectedRomUri);
+        intent.setData(romUri);
         intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
         intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         startActivity(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshRomList();
     }
 
     @Override
@@ -255,15 +478,11 @@ public class MainActivity extends Activity {
         }
         if (requestCode == REQUEST_OPEN_SAVE_FOLDER) {
             selectedSaveFolderUri = data.getData();
-            getContentResolver().takePersistableUriPermission(
-                    selectedSaveFolderUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            );
-            selectedRomUri = null;
-            saveFolderView.setText("Folder selected:\n" + selectedSaveFolderUri + "\nROM must be selected from this folder.");
-            romView.setText("No ROM selected. Supported files in selected folder: .gba, .gb, .gbc");
-            openRomButton.setEnabled(coreLoaded);
-            startButton.setEnabled(false);
+            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            getContentResolver().takePersistableUriPermission(selectedSaveFolderUri, flags);
+            prefs.edit().putString(KEY_FOLDER_URI, selectedSaveFolderUri.toString()).apply();
+            showGamesPage();
+            refreshRomList();
         }
     }
 
@@ -273,24 +492,76 @@ public class MainActivity extends Activity {
         return lower.endsWith(".gba") || lower.endsWith(".gbc") || lower.endsWith(".gb");
     }
 
+    private String removeKnownRomExtension(String name) {
+        if (name == null || name.isEmpty()) return "selected";
+        String lower = name.toLowerCase();
+        if (lower.endsWith(".gba")) return name.substring(0, name.length() - 4);
+        if (lower.endsWith(".gbc")) return name.substring(0, name.length() - 4);
+        if (lower.endsWith(".gb")) return name.substring(0, name.length() - 3);
+        return name;
+    }
+
+    private String sanitizeFileName(String input) {
+        if (input == null) return "";
+        return input.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private String displayFolderPath(Uri uri) {
+        try {
+            String treeId = DocumentsContract.getTreeDocumentId(uri);
+            if (treeId.startsWith("primary:")) {
+                return "/storage/emulated/0/" + treeId.substring("primary:".length());
+            }
+            return treeId;
+        } catch (Throwable ignored) {
+            return uri.toString();
+        }
+    }
+
+    private TextView sectionTitle(String text) {
+        TextView title = new TextView(this);
+        title.setText(text);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(18f);
+        return title;
+    }
+
+    private TextView bodyCard(String text) {
+        TextView card = new TextView(this);
+        card.setText(text);
+        card.setTextColor(Color.rgb(205, 213, 225));
+        card.setTextSize(14f);
+        card.setPadding(dp(12), dp(12), dp(12), dp(12));
+        card.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(10)));
+        return card;
+    }
+
+    private LinearLayout.LayoutParams blockParams(int left, int top, int right, int bottom) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(dp(left), dp(top), dp(right), dp(bottom));
+        return params;
+    }
+
+    private GradientDrawable makeRoundRect(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        return drawable;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private void showNotice(String title, String message) {
         new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setMessage(message)
                 .setPositiveButton("OK", null)
                 .show();
-    }
-
-    private String getDisplayName(Uri uri) {
-        try (Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                if (index >= 0) {
-                    return cursor.getString(index);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return uri.toString();
     }
 }
