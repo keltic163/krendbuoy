@@ -24,120 +24,103 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Consolidate and update GameActivity UI
+      - name: Patch GameActivity in-game UI
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
           text = path.read_text()
 
-          text = text.replace('content.setPadding(dp(8), dp(4), dp(8), dp(176));', 'content.setPadding(dp(8), dp(4), dp(8), dp(392));')
+          def must_replace(src, old, new, label):
+              if old not in src:
+                  raise SystemExit(label + ' not found')
+              return src.replace(old, new, 1)
 
-          if 'int shoulderBottomPad = dp(660);' in text:
-              text = text.replace('int shoulderBottomPad = dp(660);', 'int shoulderBottomPad = bottomPad + dp(184);')
+          text = text.replace('content.setPadding(dp(8), dp(4), dp(8), dp(176));',
+                              'content.setPadding(dp(8), dp(4), dp(8), dp(392));')
+
+          if 'private int startupLoadStateSlot = 0;' not in text:
+              text = must_replace(
+                  text,
+                  '    private int displayMode = 0;\n    private boolean debugTextVisible = false;',
+                  '    private int displayMode = 0;\n    private boolean debugTextVisible = false;\n    private int startupLoadStateSlot = 0;',
+                  'startup field insertion point'
+              )
+
+          if 'startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);' not in text:
+              text = must_replace(
+                  text,
+                  '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");',
+                  '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);\n        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {\n            startupLoadStateSlot = 0;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");',
+                  'startup intent insertion point'
+              )
+
+          if 'loadStartupStateIfRequested();' not in text:
+              text = must_replace(
+                  text,
+                  '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());',
+                  '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            loadStartupStateIfRequested();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());',
+                  'startup load call insertion point'
+              )
+
+          if 'private void loadStartupStateIfRequested()' not in text:
+              startup_method = '''    private void loadStartupStateIfRequested() {
+        if (startupLoadStateSlot <= 0) return;
+        int slot = startupLoadStateSlot;
+        startupLoadStateSlot = 0;
+        try {
+            byte[] data = readStateBytes(slot);
+            if (data == null || data.length == 0) {
+                updateInfo("Startup save state not found: Slot " + slot);
+                return;
+            }
+            boolean ok = NativeBridge.importState(data);
+            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\\n" + NativeBridge.getLastError());
+        } catch (Throwable t) {
+            updateInfo("Startup load state failed:\\n" + t.getMessage());
+        }
+    }
+
+'''
+              text = must_replace(text, '    private void loadStateNow(int slot) {', startup_method + '    private void loadStateNow(int slot) {', 'loadStateNow marker')
+
+          text = re.sub(
+              r'\s*add(?:Centered)?Control\(controls, "L", NativeBridge\.BUTTON_L,.*?\);\n\s*add(?:Centered)?Control\(controls, "R", NativeBridge\.BUTTON_R,.*?\);\n\n\s*addCenteredControl\(controls, "Select", NativeBridge\.BUTTON_SELECT,.*?\);\n\s*addCenteredControl\(controls, "Start", NativeBridge\.BUTTON_START,.*?\);',
+              '\n        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, shoulderBottomPad, -dp(46));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, shoulderBottomPad, dp(46));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(58), -dp(42));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(58), dp(42));',
+              text,
+              count=1,
+              flags=re.S
+          )
+
+          text = text.replace('int shoulderBottomPad = dp(660);', 'int shoulderBottomPad = bottomPad + dp(184);')
           if 'int shoulderBottomPad = bottomPad + dp(184);' not in text:
               text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(92);\n        int shoulderBottomPad = bottomPad + dp(184);')
           text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(92);')
 
-          old_lr_edge = '        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);\n        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(72));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(72));'
-          old_lr_center = '        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));'
-          new_lr = '        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, shoulderBottomPad, -dp(46));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, shoulderBottomPad, dp(46));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(58), -dp(42));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(58), dp(42));'
-          if old_lr_edge in text:
-              text = text.replace(old_lr_edge, new_lr)
-          elif old_lr_center in text:
-              text = text.replace(old_lr_center, new_lr)
-          elif new_lr not in text:
-              raise SystemExit('Controller L/R block not found')
+          old_menu_button = '''        addSystemControl(controls, "Menu", menuWidth, menuHeight,
+                Gravity.TOP | Gravity.RIGHT, margin, dp(8), this::showQuickMenu);'''
+          new_top_buttons = '''        addSystemControl(controls, "Save", menuWidth, menuHeight,
+                Gravity.TOP | Gravity.RIGHT, margin + menuWidth * 2 + dp(16), dp(8), () -> showStateSlotDialog(true));
+        addSystemControl(controls, "Load", menuWidth, menuHeight,
+                Gravity.TOP | Gravity.RIGHT, margin + menuWidth + dp(8), dp(8), () -> showStateSlotDialog(false));
+        addSystemControl(controls, "☰", dp(48), menuHeight,
+                Gravity.TOP | Gravity.RIGHT, margin, dp(8), this::showQuickMenu);'''
+          if 'addSystemControl(controls, "Save", menuWidth, menuHeight' not in text:
+              text = must_replace(text, old_menu_button, new_top_buttons, 'top-right menu button block')
 
-          if 'private int startupLoadStateSlot = 0;' not in text:
-              text = text.replace('    private int displayMode = 0;\n    private boolean debugTextVisible = false;', '    private int displayMode = 0;\n    private boolean debugTextVisible = false;\n    private int startupLoadStateSlot = 0;')
-          if 'startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);' not in text:
-              old = '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");'
-              new = '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);\n        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {\n            startupLoadStateSlot = 0;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");'
-              if old not in text:
-                  raise SystemExit('Intent load_state_slot insertion point not found')
-              text = text.replace(old, new)
-          if 'loadStartupStateIfRequested();' not in text:
-              old = '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());'
-              new = '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            loadStartupStateIfRequested();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());'
-              if old not in text:
-                  raise SystemExit('Startup load call insertion point not found')
-              text = text.replace(old, new)
-          if 'private void loadStartupStateIfRequested()' not in text:
-              marker = '    private void loadStateNow(int slot) {'
-              method = (
-                  '    private void loadStartupStateIfRequested() {\n'
-                  '        if (startupLoadStateSlot <= 0) return;\n'
-                  '        int slot = startupLoadStateSlot;\n'
-                  '        startupLoadStateSlot = 0;\n'
-                  '        try {\n'
-                  '            byte[] data = readStateBytes(slot);\n'
-                  '            if (data == null || data.length == 0) {\n'
-                  '                updateInfo("Startup save state not found: Slot " + slot);\n'
-                  '                return;\n'
-                  '            }\n'
-                  '            boolean ok = NativeBridge.importState(data);\n'
-                  '            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\\n" + NativeBridge.getLastError());\n'
-                  '        } catch (Throwable t) {\n'
-                  '            updateInfo("Startup load state failed:\\n" + t.getMessage());\n'
-                  '        }\n'
-                  '    }\n\n'
-              )
-              if marker not in text:
-                  raise SystemExit('loadStateNow marker not found')
-              text = text.replace(marker, method + marker)
-
-          old_save = '                    if (save) {\n                        saveStateNow(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
-          new_save = '                    if (save) {\n                        confirmAndSaveState(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
-          if old_save in text:
-              text = text.replace(old_save, new_save, 1)
-          elif new_save not in text:
-              raise SystemExit('Save state slot handler not found')
-          if 'private void confirmAndSaveState(int slot)' not in text:
-              marker = '    private void saveStateNow(int slot) {'
-              method = (
-                  '    private void confirmAndSaveState(int slot) {\n'
-                  '        if (getStateModifiedTime(slot) <= 0) {\n'
-                  '            saveStateNow(slot);\n'
-                  '            return;\n'
-                  '        }\n'
-                  '        new AlertDialog.Builder(this)\n'
-                  '                .setTitle("Overwrite Save State")\n'
-                  '                .setMessage("Slot " + slot + " already has a save state.\\n" + stateSlotLabel(slot) + "\\n\\nOverwrite it?")\n'
-                  '                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))\n'
-                  '                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())\n'
-                  '                .setOnCancelListener(dialog -> resumeEmulationFromMenu())\n'
-                  '                .show();\n'
-                  '    }\n\n'
-              )
-              if marker not in text:
-                  raise SystemExit('saveStateNow marker not found')
-              text = text.replace(marker, method + marker)
-
-          old_menu_button = '        addSystemControl(controls, "Menu", menuWidth, menuHeight,\n                Gravity.TOP | Gravity.RIGHT, margin, dp(8), this::showQuickMenu);'
-          new_top_buttons = '        addSystemControl(controls, "Save", menuWidth, menuHeight,\n                Gravity.TOP | Gravity.RIGHT, margin + menuWidth * 2 + dp(16), dp(8), () -> showStateSlotDialog(true));\n        addSystemControl(controls, "Load", menuWidth, menuHeight,\n                Gravity.TOP | Gravity.RIGHT, margin + menuWidth + dp(8), dp(8), () -> showStateSlotDialog(false));\n        addSystemControl(controls, "☰", dp(48), menuHeight,\n                Gravity.TOP | Gravity.RIGHT, margin, dp(8), this::showQuickMenu);'
-          if old_menu_button in text:
-              text = text.replace(old_menu_button, new_top_buttons)
-          elif 'addSystemControl(controls, "Save", menuWidth, menuHeight' not in text:
-              raise SystemExit('Top menu button block not found')
-
-          old_items = 'String[] items = {"Resume", "Return to Main Menu", "Save State", "Load State", "Display Settings", "Audio Preset", "Exit Game"};'
-          new_items = 'String[] items = {"Resume", "Restart Game", "Return to Main Menu", "Display Settings", "Audio Preset", "Exit Game"};'
-          text = text.replace(old_items, new_items)
-          old_which = '''                    } else if (which == 1) {
-                        leaveGame();
-                    } else if (which == 2) {
-                        showStateSlotDialog(true);
-                    } else if (which == 3) {
-                        showStateSlotDialog(false);
-                    } else if (which == 4) {
-                        showDisplaySettingsDialog();
-                    } else if (which == 5) {
-                        showAudioPresetDialog();
-                    } else if (which == 6) {
-                        leaveGame();
-                    }'''
-          new_which = '''                    } else if (which == 1) {
+          new_quick_menu = '''    private void showQuickMenu() {
+        pauseEmulationForMenu();
+        releaseAllButtons();
+        String[] items = {"Resume", "Restart Game", "Return to Main Menu", "Display Settings", "Audio Preset", "Exit Game"};
+        new AlertDialog.Builder(this)
+                .setTitle("KrendBuoy Menu")
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        resumeEmulationFromMenu();
+                        dialog.dismiss();
+                    } else if (which == 1) {
                         restartGame();
                     } else if (which == 2) {
                         leaveGame();
@@ -147,94 +130,115 @@ jobs:
                         showAudioPresetDialog();
                     } else if (which == 5) {
                         leaveGame();
-                    }'''
-          if old_which in text:
-              text = text.replace(old_which, new_which)
-          elif 'restartGame();' not in text:
-              raise SystemExit('Quick menu handler block not found')
+                    }
+                })
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+'''
+          text, n = re.subn(r'    private void showQuickMenu\(\) \{.*?\n    \}\n\n    private void pauseEmulationForMenu\(\) \{', new_quick_menu + '    private void pauseEmulationForMenu() {', text, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('showQuickMenu method not found')
 
           if 'private void restartGame()' not in text:
-              marker = '    private void leaveGame() {'
-              method = (
-                  '    private void restartGame() {\n'
-                  '        if (finishingFromMenu) return;\n'
-                  '        finishingFromMenu = true;\n'
-                  '        NativeBridge.saveSram();\n'
-                  '        exportPortableSramIfEnabled();\n'
-                  '        releaseAllButtons();\n'
-                  '        stopAudioPlayback();\n'
-                  '        startActivity(getIntent());\n'
-                  '        finish();\n'
-                  '    }\n\n'
-              )
-              if marker not in text:
-                  raise SystemExit('leaveGame marker not found')
-              text = text.replace(marker, method + marker)
+              restart_method = '''    private void restartGame() {
+        if (finishingFromMenu) return;
+        finishingFromMenu = true;
+        NativeBridge.saveSram();
+        exportPortableSramIfEnabled();
+        releaseAllButtons();
+        stopAudioPlayback();
+        startActivity(getIntent());
+        finish();
+    }
 
-          if 'Controller", dp(112), dp(44)' not in text:
-              insert_after = '        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(58), dp(42));'
-              bottom_nav = (
-                  '\n\n        addSystemControl(controls, "Controller", dp(112), dp(44),\n'
-                  '                Gravity.BOTTOM | Gravity.LEFT, margin, dp(4), this::showControllerSettingsDialog);\n'
-                  '        addCenteredSystemControl(controls, "Cheats", dp(104), dp(44), dp(4), this::showCheatsComingSoon);\n'
-                  '        addSystemControl(controls, "Settings", dp(112), dp(44),\n'
-                  '                Gravity.BOTTOM | Gravity.RIGHT, margin, dp(4), this::showGlobalSettingsDialog);'
-              )
-              if insert_after not in text:
-                  raise SystemExit('Start button insertion point not found')
-              text = text.replace(insert_after, insert_after + bottom_nav)
+'''
+              text = must_replace(text, '    private void leaveGame() {', restart_method + '    private void leaveGame() {', 'leaveGame marker')
+
+          old_save = '                    if (save) {\n                        saveStateNow(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
+          new_save = '                    if (save) {\n                        confirmAndSaveState(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
+          if old_save in text:
+              text = text.replace(old_save, new_save, 1)
+          elif new_save not in text:
+              raise SystemExit('save/load slot handler not found')
+
+          if 'private void confirmAndSaveState(int slot)' not in text:
+              confirm_method = '''    private void confirmAndSaveState(int slot) {
+        if (getStateModifiedTime(slot) <= 0) {
+            saveStateNow(slot);
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Overwrite Save State")
+                .setMessage("Slot " + slot + " already has a save state.\n" + stateSlotLabel(slot) + "\n\nOverwrite it?")
+                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+'''
+              text = must_replace(text, '    private void saveStateNow(int slot) {', confirm_method + '    private void saveStateNow(int slot) {', 'saveStateNow marker')
 
           if 'private void addCenteredSystemControl' not in text:
-              marker = '    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {'
-              method = (
-                  '    private void addCenteredSystemControl(FrameLayout parent, String label, int width, int height, int bottomMargin, Runnable action) {\n'
-                  '        TextView view = makeSystemButton(label, action);\n'
-                  '        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);\n'
-                  '        lp.bottomMargin = bottomMargin;\n'
-                  '        parent.addView(view, lp);\n'
-                  '    }\n\n'
-              )
-              if marker not in text:
-                  raise SystemExit('addControl marker not found')
-              text = text.replace(marker, method + marker)
+              helper = '''    private void addCenteredSystemControl(FrameLayout parent, String label, int width, int height, int bottomMargin, Runnable action) {
+        TextView view = makeSystemButton(label, action);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        lp.bottomMargin = bottomMargin;
+        parent.addView(view, lp);
+    }
+
+'''
+              text = must_replace(text, '    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {', helper + '    private void addControl(FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {', 'addControl marker')
+
+          if 'Controller", dp(112), dp(44)' not in text:
+              start_line = '        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(58), dp(42));'
+              bottom_nav = '''
+
+        addSystemControl(controls, "Controller", dp(112), dp(44),
+                Gravity.BOTTOM | Gravity.LEFT, margin, dp(4), this::showControllerSettingsDialog);
+        addCenteredSystemControl(controls, "Cheats", dp(104), dp(44), dp(4), this::showCheatsComingSoon);
+        addSystemControl(controls, "Settings", dp(112), dp(44),
+                Gravity.BOTTOM | Gravity.RIGHT, margin, dp(4), this::showGlobalSettingsDialog);'''
+              text = must_replace(text, start_line, start_line + bottom_nav, 'bottom nav insertion point')
 
           if 'private void showControllerSettingsDialog()' not in text:
-              marker = '    private void showDisplaySettingsDialog() {'
-              methods = (
-                  '    private void showControllerSettingsDialog() {\n'
-                  '        pauseEmulationForMenu();\n'
-                  '        String[] items = {"Controller Layout: GBA SP Style", "Button Size: Default", "Button Opacity: Default"};\n'
-                  '        new AlertDialog.Builder(this)\n'
-                  '                .setTitle("Controller Settings")\n'
-                  '                .setItems(items, (dialog, which) -> {\n'
-                  '                    showQuickNotice("Controller Settings", "Controller customization will be added in a later build.");\n'
-                  '                })\n'
-                  '                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())\n'
-                  '                .setOnCancelListener(dialog -> resumeEmulationFromMenu())\n'
-                  '                .show();\n'
-                  '    }\n\n'
-                  '    private void showCheatsComingSoon() {\n'
-                  '        pauseEmulationForMenu();\n'
-                  '        showQuickNotice("Cheats", "Cheat support is not implemented yet.");\n'
-                  '    }\n\n'
-                  '    private void showGlobalSettingsDialog() {\n'
-                  '        pauseEmulationForMenu();\n'
-                  '        String[] items = {"Controller Settings", "Display Settings", "Audio Preset"};\n'
-                  '        new AlertDialog.Builder(this)\n'
-                  '                .setTitle("Settings")\n'
-                  '                .setItems(items, (dialog, which) -> {\n'
-                  '                    if (which == 0) showControllerSettingsDialog();\n'
-                  '                    else if (which == 1) showDisplaySettingsDialog();\n'
-                  '                    else if (which == 2) showAudioPresetDialog();\n'
-                  '                })\n'
-                  '                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())\n'
-                  '                .setOnCancelListener(dialog -> resumeEmulationFromMenu())\n'
-                  '                .show();\n'
-                  '    }\n\n'
-              )
-              if marker not in text:
-                  raise SystemExit('Display settings marker not found')
-              text = text.replace(marker, methods + marker)
+              methods = '''    private void showControllerSettingsDialog() {
+        pauseEmulationForMenu();
+        String[] items = {"Controller Layout: GBA SP Style", "Button Size: Default", "Button Opacity: Default"};
+        new AlertDialog.Builder(this)
+                .setTitle("Controller Settings")
+                .setItems(items, (dialog, which) -> {
+                    showQuickNotice("Controller Settings", "Controller customization will be added in a later build.");
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+    private void showCheatsComingSoon() {
+        pauseEmulationForMenu();
+        showQuickNotice("Cheats", "Cheat support is not implemented yet.");
+    }
+
+    private void showGlobalSettingsDialog() {
+        pauseEmulationForMenu();
+        String[] items = {"Controller Settings", "Display Settings", "Audio Preset"};
+        new AlertDialog.Builder(this)
+                .setTitle("Settings")
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) showControllerSettingsDialog();
+                    else if (which == 1) showDisplaySettingsDialog();
+                    else if (which == 2) showAudioPresetDialog();
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+'''
+              text = must_replace(text, '    private void showDisplaySettingsDialog() {', methods + '    private void showDisplaySettingsDialog() {', 'showDisplaySettingsDialog marker')
 
           required = [
               'addSystemControl(controls, "Save",',
