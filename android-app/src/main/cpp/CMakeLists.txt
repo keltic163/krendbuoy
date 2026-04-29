@@ -14,6 +14,7 @@ find_library(log-lib log)
 
 target_link_options(vbam_frontend PRIVATE
     -Wl,--allow-shlib-undefined
+    -Wl,-z,max-page-size=16384
 )
 
 target_link_libraries(vbam_frontend
