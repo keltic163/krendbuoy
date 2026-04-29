@@ -1,7 +1,9 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+KrendBuoy is a modern Android GBA emulator, built upon and forked from the legendary open-source project [VisualBoyAdvance-M](https://github.com/visualboyadvance-m/visualboyadvance-m).
 
+--------------------------------------------------------------------------------
 - [Visual Boy Advance - M](#visual-boy-advance---m)
   - [System Requirements](#system-requirements)
   - [Building](#building)
