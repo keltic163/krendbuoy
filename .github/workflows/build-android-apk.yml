@@ -25,18 +25,13 @@ jobs:
           from pathlib import Path
           path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
           text = path.read_text()
-          text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(88);\n        int shoulderBottomPad = dp(660);')
-          text = text.replace('''        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));
-        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));
-
-        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));
-        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));''', '''        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
-                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);
-        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
-                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);
-
-        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(72));
-        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(72));''')
+          if 'int shoulderBottomPad = dp(660);' not in text:
+              text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(88);\n        int shoulderBottomPad = dp(660);')
+          old = '        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));'
+          new = '        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);\n        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(72));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(72));'
+          if old not in text:
+              raise SystemExit('Expected L/R layout block not found')
+          text = text.replace(old, new)
           path.write_text(text)
           PY
 
