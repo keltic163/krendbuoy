@@ -59,10 +59,18 @@ final class FrameLoopManager {
 
     void stop() {
         running = false;
-        if (frameThread != null) {
-            frameThread.interrupt();
-            frameThread = null;
+        Thread thread = frameThread;
+        if (thread != null) {
+            thread.interrupt();
+            if (thread != Thread.currentThread()) {
+                try {
+                    thread.join(250);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
+        frameThread = null;
     }
 
     boolean isRunning() {
