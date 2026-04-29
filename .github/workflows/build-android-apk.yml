@@ -29,7 +29,7 @@ jobs:
               text = text.replace('int bottomPad = dp(88);', 'int bottomPad = dp(88);\n        int shoulderBottomPad = dp(660);')
           old = '        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));\n        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));'
           new = '        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);\n        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,\n                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);\n\n        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(72));\n        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(72));'
-          if old not in text:
+          if old not in text and new not in text:
               raise SystemExit('Expected L/R layout block not found')
           text = text.replace(old, new)
           path.write_text(text)
@@ -43,52 +43,58 @@ jobs:
           text = path.read_text()
 
           if 'private int startupLoadStateSlot = 0;' not in text:
-              text = text.replace('    private int displayMode = 0;\n    private boolean debugTextVisible = false;', '    private int displayMode = 0;\n    private boolean debugTextVisible = false;\n    private int startupLoadStateSlot = 0;')
+              text = text.replace(
+                  '    private int displayMode = 0;\n    private boolean debugTextVisible = false;',
+                  '    private int displayMode = 0;\n    private boolean debugTextVisible = false;\n    private int startupLoadStateSlot = 0;'
+              )
 
           if 'startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);' not in text:
-              text = text.replace('''        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
-            audioBacklogSamples = -1;
-        }
-        String saveFolder = getIntent().getStringExtra("save_folder_uri");''', '''        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
-            audioBacklogSamples = -1;
-        }
-        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
-        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {
-            startupLoadStateSlot = 0;
-        }
-        String saveFolder = getIntent().getStringExtra("save_folder_uri");''')
+              old = '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");'
+              new = '        if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {\n            audioBacklogSamples = -1;\n        }\n        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);\n        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {\n            startupLoadStateSlot = 0;\n        }\n        String saveFolder = getIntent().getStringExtra("save_folder_uri");'
+              if old not in text:
+                  raise SystemExit('Intent load_state_slot insertion point not found')
+              text = text.replace(old, new)
 
           if 'loadStartupStateIfRequested();' not in text:
-              text = text.replace('''            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
-            importPortableSramIfAvailable();
-            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());''', '''            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
-            importPortableSramIfAvailable();
-            loadStartupStateIfRequested();
-            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());''')
+              old = '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());'
+              new = '            NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);\n            importPortableSramIfAvailable();\n            loadStartupStateIfRequested();\n            updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\\n" + NativeBridge.getLastError());'
+              if old not in text:
+                  raise SystemExit('Startup load call insertion point not found')
+              text = text.replace(old, new)
 
           if 'private void loadStartupStateIfRequested()' not in text:
               marker = '    private void loadStateNow(int slot) {'
-              method = '''    private void loadStartupStateIfRequested() {
-        if (startupLoadStateSlot <= 0) return;
-        int slot = startupLoadStateSlot;
-        startupLoadStateSlot = 0;
-        try {
-            byte[] data = readStateBytes(slot);
-            if (data == null || data.length == 0) {
-                updateInfo("Startup save state not found: Slot " + slot);
-                return;
-            }
-            boolean ok = NativeBridge.importState(data);
-            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\\n" + NativeBridge.getLastError());
-        } catch (Throwable t) {
-            updateInfo("Startup load state failed:\\n" + t.getMessage());
-        }
-    }
-
-'''
+              method = (
+                  '    private void loadStartupStateIfRequested() {\n'
+                  '        if (startupLoadStateSlot <= 0) return;\n'
+                  '        int slot = startupLoadStateSlot;\n'
+                  '        startupLoadStateSlot = 0;\n'
+                  '        try {\n'
+                  '            byte[] data = readStateBytes(slot);\n'
+                  '            if (data == null || data.length == 0) {\n'
+                  '                updateInfo("Startup save state not found: Slot " + slot);\n'
+                  '                return;\n'
+                  '            }\n'
+                  '            boolean ok = NativeBridge.importState(data);\n'
+                  '            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\\n" + NativeBridge.getLastError());\n'
+                  '        } catch (Throwable t) {\n'
+                  '            updateInfo("Startup load state failed:\\n" + t.getMessage());\n'
+                  '        }\n'
+                  '    }\n\n'
+              )
               if marker not in text:
                   raise SystemExit('loadStateNow marker not found')
               text = text.replace(marker, method + marker)
+
+          required = [
+              'private int startupLoadStateSlot = 0;',
+              'startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);',
+              'loadStartupStateIfRequested();',
+              'private void loadStartupStateIfRequested()'
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit('Startup save state patch incomplete: ' + ', '.join(missing))
 
           path.write_text(text)
           PY
