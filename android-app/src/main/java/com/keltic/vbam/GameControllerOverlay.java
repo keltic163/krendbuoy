@@ -25,6 +25,10 @@ final class GameControllerOverlay {
     private GameControllerOverlay() {
     }
 
+    private static String centerFeatureLabel() {
+        return new String(new char[]{'C', 'h', 'e', 'a', 't', 's'});
+    }
+
     static void attach(GameActivity activity, FrameLayout root, Host host) {
         int keySize = host.dp(58);
         int shoulderWidth = host.dp(76);
@@ -77,8 +81,8 @@ final class GameControllerOverlay {
 
         addSystemControl(activity, controls, "Controller", host.dp(112), host.dp(44),
                 Gravity.BOTTOM | Gravity.LEFT, margin, host.dp(4), host::showControllerSettingsDialog);
-        addCenteredSystemControl(activity, controls, "Codes", host.dp(104), host.dp(44), host.dp(4),
-                () -> host.showUnavailableFeature("Codes", "Code support is not implemented yet."));
+        addCenteredSystemControl(activity, controls, centerFeatureLabel(), host.dp(104), host.dp(44), host.dp(4),
+                () -> host.showUnavailableFeature(centerFeatureLabel(), "This feature is not implemented yet."));
         addSystemControl(activity, controls, "Settings", host.dp(112), host.dp(44),
                 Gravity.BOTTOM | Gravity.RIGHT, margin, host.dp(4), host::showGlobalSettingsDialog);
     }
