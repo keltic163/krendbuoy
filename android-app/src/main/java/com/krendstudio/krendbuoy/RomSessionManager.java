@@ -8,6 +8,7 @@ import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.Locale;
 
 final class RomSessionManager {
     static final class Result {
@@ -41,7 +42,7 @@ final class RomSessionManager {
         try {
             String romDisplayName = getDisplayName(romUri);
             String romBaseName = removeKnownRomExtension(romDisplayName);
-            File localRom = copyRomToLocalFile(romUri);
+            File localRom = copyRomToLocalFile(romUri, romDisplayName);
             File systemDir = ensureDirectory("system");
             File saveDir = ensureDirectory("save");
             NativeBridge.setDirectories(systemDir.getAbsolutePath(), saveDir.getAbsolutePath());
@@ -60,8 +61,9 @@ final class RomSessionManager {
         return dir;
     }
 
-    private File copyRomToLocalFile(Uri uri) throws Exception {
-        File target = new File(activity.getCacheDir(), "selected-rom-" + System.currentTimeMillis());
+    private File copyRomToLocalFile(Uri uri, String displayName) throws Exception {
+        String extension = getKnownRomExtension(displayName);
+        File target = new File(activity.getCacheDir(), "selected-rom-" + System.currentTimeMillis() + extension);
         try (InputStream input = activity.getContentResolver().openInputStream(uri); FileOutputStream output = new FileOutputStream(target)) {
             if (input == null) throw new IllegalStateException("Unable to open ROM input stream");
             byte[] buffer = new byte[16384];
@@ -82,9 +84,18 @@ final class RomSessionManager {
 
     private String removeKnownRomExtension(String name) {
         if (name == null || name.isEmpty()) return "selected";
-        String lower = name.toLowerCase();
+        String lower = name.toLowerCase(Locale.US);
         if (lower.endsWith(".gba") || lower.endsWith(".gbc")) return name.substring(0, name.length() - 4);
         if (lower.endsWith(".gb")) return name.substring(0, name.length() - 3);
         return name;
+    }
+
+    private String getKnownRomExtension(String name) {
+        if (name == null) return "";
+        String lower = name.toLowerCase(Locale.US);
+        if (lower.endsWith(".gba")) return ".gba";
+        if (lower.endsWith(".gbc")) return ".gbc";
+        if (lower.endsWith(".gb")) return ".gb";
+        return "";
     }
 }
