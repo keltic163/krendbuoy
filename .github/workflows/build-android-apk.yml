@@ -99,6 +99,49 @@ jobs:
           path.write_text(text)
           PY
 
+      - name: Apply save state overwrite confirmation patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/src/main/java/com/keltic/vbam/GameActivity.java')
+          text = path.read_text()
+
+          old = '                    if (save) {\n                        saveStateNow(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
+          new = '                    if (save) {\n                        confirmAndSaveState(slot);\n                    } else {\n                        loadStateNow(slot);\n                    }'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('Save state slot handler not found')
+
+          if 'private void confirmAndSaveState(int slot)' not in text:
+              marker = '    private void saveStateNow(int slot) {'
+              method = (
+                  '    private void confirmAndSaveState(int slot) {\n'
+                  '        if (getStateModifiedTime(slot) <= 0) {\n'
+                  '            saveStateNow(slot);\n'
+                  '            return;\n'
+                  '        }\n'
+                  '        new AlertDialog.Builder(this)\n'
+                  '                .setTitle("Overwrite Save State")\n'
+                  '                .setMessage("Slot " + slot + " already has a save state.\\n" + stateSlotLabel(slot) + "\\n\\nOverwrite it?")\n'
+                  '                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))\n'
+                  '                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())\n'
+                  '                .setOnCancelListener(dialog -> resumeEmulationFromMenu())\n'
+                  '                .show();\n'
+                  '    }\n\n'
+              )
+              if marker not in text:
+                  raise SystemExit('saveStateNow marker not found')
+              text = text.replace(marker, method + marker)
+
+          required = ['confirmAndSaveState(slot);', 'private void confirmAndSaveState(int slot)', 'Overwrite Save State']
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit('Overwrite confirmation patch incomplete: ' + ', '.join(missing))
+
+          path.write_text(text)
+          PY
+
       - name: Create stable debug keystore
         run: |
           keytool -genkeypair \
