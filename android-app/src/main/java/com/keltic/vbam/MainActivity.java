@@ -22,9 +22,12 @@ import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
@@ -405,7 +408,7 @@ public class MainActivity extends Activity {
     private void showLoadStateSlotDialog(RomEntry entry) {
         String[] labels = new String[5];
         for (int slot = 1; slot <= 5; slot++) {
-            labels[slot - 1] = stateSlotExists(entry.baseName, slot) ? "Slot " + slot + " - Available" : "Slot " + slot + " - Empty";
+            labels[slot - 1] = stateSlotLabel(entry.baseName, slot);
         }
         new AlertDialog.Builder(this)
                 .setTitle("Load State Slot")
@@ -419,6 +422,25 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private String stateSlotLabel(String baseName, int slot) {
+        long modified = getStateModifiedTime(baseName, slot);
+        if (modified <= 0) {
+            return "Slot " + slot + " - Empty";
+        }
+        return "Slot " + slot + " - " + formatTimestamp(modified);
+    }
+
+    private long getStateModifiedTime(String baseName, int slot) {
+        Uri stateDir = findRootChild(STATE_FOLDER_NAME);
+        if (stateDir == null) return 0;
+        String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
+        return findChildModifiedTimeIn(stateDir, fileName);
+    }
+
+    private String formatTimestamp(long timestamp) {
+        return new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(timestamp));
     }
 
     private void showRomFileInfo(RomEntry entry) {
@@ -459,10 +481,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean stateSlotExists(String baseName, int slot) {
-        Uri stateDir = findRootChild(STATE_FOLDER_NAME);
-        if (stateDir == null) return false;
-        String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
-        return findChildIn(stateDir, fileName) != null;
+        return getStateModifiedTime(baseName, slot) > 0;
     }
 
     private Uri findRootChild(String fileName) {
@@ -498,6 +517,31 @@ public class MainActivity extends Activity {
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    private long findChildModifiedTimeIn(Uri parentDocumentUri, String fileName) {
+        if (selectedSaveFolderUri == null || parentDocumentUri == null) return 0;
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                selectedSaveFolderUri,
+                DocumentsContract.getDocumentId(parentDocumentUri)
+        );
+        try (Cursor cursor = getContentResolver().query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED},
+                null,
+                null,
+                null
+        )) {
+            if (cursor == null) return 0;
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(0);
+                if (fileName.equals(name)) {
+                    return cursor.getLong(1);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0;
     }
 
     private void startGame(Uri romUri, int loadStateSlot) {
