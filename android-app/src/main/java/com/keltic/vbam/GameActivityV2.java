@@ -2,11 +2,9 @@ package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.DocumentsContract;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,11 +13,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host, FrameLoopManager.Host {
+public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host, FrameLoopManager.Host, PortableSaveManager.Host {
     private TextView info;
     private ImageView screen;
     private volatile boolean finishingFromMenu;
@@ -27,6 +21,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
     private RomSessionManager romSessionManager;
+    private PortableSaveManager portableSaveManager;
     private int audioBacklogSamples = -1;
     private Uri portableSaveFolderUri;
     private String romBaseName = "selected";
@@ -45,6 +40,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) startupLoadStateSlot = 0;
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
         if (saveFolder != null && !saveFolder.isEmpty()) portableSaveFolderUri = Uri.parse(saveFolder);
+        portableSaveManager = new PortableSaveManager(this, portableSaveFolderUri, this);
 
         FrameLayout root = new FrameLayout(this);
         LinearLayout content = new LinearLayout(this);
@@ -160,6 +156,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public String audioPresetLabelForFrameLoop() {
         return audioPresetLabel(audioBacklogSamples);
+    }
+
+    @Override
+    public void updatePortableSaveInfo(String text) {
+        updateInfo(text);
     }
 
     @Override
@@ -342,60 +343,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void importPortableSramIfAvailable() {
-        if (portableSaveFolderUri == null) return;
-        try {
-            Uri sav = findChildDocument(romBaseName + ".sav");
-            Uri srm = sav != null ? sav : findChildDocument(romBaseName + ".srm");
-            if (srm == null) return;
-            byte[] data = readAllBytes(srm);
-            if (data != null && data.length > 0) NativeBridge.importSram(data);
-        } catch (Throwable t) {
-            updateInfo("Portable save load failed:\n" + t.getMessage());
-        }
+        if (portableSaveManager != null) portableSaveManager.importIfAvailable(romBaseName);
     }
 
     private void exportPortableSramIfEnabled() {
-        if (portableSaveFolderUri == null) return;
-        try {
-            byte[] data = NativeBridge.exportSram();
-            if (data == null || data.length == 0) return;
-            Uri target = findChildDocument(romBaseName + ".sav");
-            if (target == null) target = createChildDocument(romBaseName + ".sav");
-            if (target == null) return;
-            try (OutputStream output = getContentResolver().openOutputStream(target, "wt")) {
-                if (output != null) {
-                    output.write(data);
-                    output.flush();
-                }
-            }
-        } catch (Throwable t) {
-            updateInfo("Portable save write failed:\n" + t.getMessage());
-        }
-    }
-
-    private Uri findChildDocument(String fileName) {
-        if (portableSaveFolderUri == null) return null;
-        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(portableSaveFolderUri, DocumentsContract.getTreeDocumentId(portableSaveFolderUri));
-        try (Cursor cursor = getContentResolver().query(childrenUri, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID}, null, null, null)) {
-            if (cursor == null) return null;
-            while (cursor.moveToNext()) if (fileName.equals(cursor.getString(0))) return DocumentsContract.buildDocumentUriUsingTree(portableSaveFolderUri, cursor.getString(1));
-        }
-        return null;
-    }
-
-    private Uri createChildDocument(String fileName) throws Exception {
-        Uri parent = DocumentsContract.buildDocumentUriUsingTree(portableSaveFolderUri, DocumentsContract.getTreeDocumentId(portableSaveFolderUri));
-        return DocumentsContract.createDocument(getContentResolver(), parent, "application/octet-stream", fileName);
-    }
-
-    private byte[] readAllBytes(Uri uri) throws Exception {
-        try (InputStream input = getContentResolver().openInputStream(uri); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            if (input == null) return null;
-            byte[] buffer = new byte[16384];
-            int read;
-            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-            return output.toByteArray();
-        }
+        if (portableSaveManager != null) portableSaveManager.exportIfEnabled(romBaseName);
     }
 
     private void updateInfo(String text) {
