@@ -1,11 +1,12 @@
 package com.krendstudio.krendbuoy;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 
 /**
  * Shared settings dialogs used from the in-game screen.
  * MainActivity and GameActivity should read and write the same preferences,
- * while GameActivity also pauses and resumes the running game around dialogs.
+ * while the in-game Activity also pauses and resumes the running game around dialogs.
  */
 final class GameSettingsDialogs {
     interface Host {
@@ -19,7 +20,7 @@ final class GameSettingsDialogs {
     private GameSettingsDialogs() {
     }
 
-    static void showGlobalSettings(GameActivity activity, Host host) {
+    static void showGlobalSettings(Activity activity, Host host) {
         host.pauseEmulationForMenu();
         String[] items = {"Controller Settings", "Display Settings", "Audio Preset"};
         new AlertDialog.Builder(activity)
@@ -34,7 +35,7 @@ final class GameSettingsDialogs {
                 .show();
     }
 
-    static void showControllerSettings(GameActivity activity, Host host) {
+    static void showControllerSettings(Activity activity, Host host) {
         host.pauseEmulationForMenu();
         String[] items = {
                 "Controller Layout: GBA SP Style",
@@ -49,7 +50,7 @@ final class GameSettingsDialogs {
                 .show();
     }
 
-    private static void showControllerPending(GameActivity activity) {
+    private static void showControllerPending(Activity activity) {
         new AlertDialog.Builder(activity)
                 .setTitle("Controller Settings")
                 .setMessage("Controller customization will be added in a later build.")
