@@ -29,6 +29,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class GameActivity extends Activity {
     private TextView info;
@@ -63,8 +66,8 @@ public class GameActivity extends Activity {
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER);
-        content.setPadding(dp(12), dp(12), dp(12), dp(12));
+        content.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        content.setPadding(dp(8), dp(4), dp(8), dp(176));
         root.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -308,7 +311,10 @@ public class GameActivity extends Activity {
     }
 
     private void showStateSlotDialog(boolean save) {
-        String[] labels = {"Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"};
+        String[] labels = new String[5];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = stateSlotLabel(i + 1);
+        }
         new AlertDialog.Builder(this)
                 .setTitle(save ? "Save State" : "Load State")
                 .setItems(labels, (dialog, which) -> {
@@ -322,6 +328,33 @@ public class GameActivity extends Activity {
                 .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
+    }
+
+    private String stateSlotLabel(int slot) {
+        long modified = getStateModifiedTime(slot);
+        if (modified <= 0) {
+            return "Slot " + slot + " - Empty";
+        }
+        return "Slot " + slot + " - " + formatTimestamp(modified);
+    }
+
+    private long getStateModifiedTime(int slot) {
+        try {
+            if (portableSaveFolderUri != null) {
+                Uri stateDir = getOrCreatePortableStateFolder();
+                if (stateDir == null) return 0;
+                return findChildModifiedTimeIn(stateDir, stateFileName(slot));
+            }
+            File stateDir = new File(ensureDirectory("states"), sanitizeFileName(romBaseName));
+            File inFile = new File(stateDir, stateFileName(slot));
+            return inFile.exists() ? inFile.lastModified() : 0;
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private String formatTimestamp(long timestamp) {
+        return new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(timestamp));
     }
 
     private void saveStateNow(int slot) {
@@ -451,6 +484,31 @@ public class GameActivity extends Activity {
             }
         }
         return null;
+    }
+
+    private long findChildModifiedTimeIn(Uri parentDocumentUri, String fileName) {
+        if (portableSaveFolderUri == null || parentDocumentUri == null) return 0;
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                portableSaveFolderUri,
+                DocumentsContract.getDocumentId(parentDocumentUri)
+        );
+        try (Cursor cursor = getContentResolver().query(
+                childrenUri,
+                new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED},
+                null,
+                null,
+                null
+        )) {
+            if (cursor == null) return 0;
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(0);
+                if (fileName.equals(name)) {
+                    return cursor.getLong(1);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0;
     }
 
     private Uri createChildDocumentIn(Uri parentDocumentUri, String fileName, String mimeType) throws Exception {
@@ -655,13 +713,15 @@ public class GameActivity extends Activity {
 
     private void addVirtualControls(FrameLayout root) {
         int keySize = dp(58);
-        int shoulderWidth = dp(72);
-        int shoulderHeight = dp(44);
+        int shoulderWidth = dp(76);
+        int shoulderHeight = dp(42);
         int menuWidth = dp(88);
-        int menuHeight = dp(42);
+        int menuHeight = dp(38);
+        int startSelectWidth = dp(96);
+        int startSelectHeight = dp(40);
         int margin = dp(16);
         int gap = dp(8);
-        int bottomPad = dp(56);
+        int bottomPad = dp(88);
 
         FrameLayout controls = new FrameLayout(this);
         controls.setClipChildren(false);
@@ -672,7 +732,7 @@ public class GameActivity extends Activity {
         ));
 
         addSystemControl(controls, "Menu", menuWidth, menuHeight,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, margin, this::showQuickMenu);
+                Gravity.TOP | Gravity.RIGHT, margin, dp(8), this::showQuickMenu);
 
         addControl(controls, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
                 Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, bottomPad + keySize * 2 + gap * 2);
@@ -688,15 +748,11 @@ public class GameActivity extends Activity {
         addControl(controls, "A", NativeBridge.BUTTON_A, keySize, keySize,
                 Gravity.BOTTOM | Gravity.RIGHT, margin, bottomPad + keySize * 2 + gap * 2);
 
-        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
-                Gravity.TOP | Gravity.LEFT, margin, margin);
-        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
-                Gravity.TOP | Gravity.RIGHT, margin, margin);
+        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));
+        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));
 
-        addControl(controls, "Select", NativeBridge.BUTTON_SELECT, menuWidth, menuHeight,
-                Gravity.BOTTOM | Gravity.LEFT, dp(168), dp(8));
-        addControl(controls, "Start", NativeBridge.BUTTON_START, menuWidth, menuHeight,
-                Gravity.BOTTOM | Gravity.RIGHT, dp(168), dp(8));
+        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));
+        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));
     }
 
     private void addSystemControl(FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
@@ -716,6 +772,14 @@ public class GameActivity extends Activity {
         else if ((gravity & Gravity.LEFT) == Gravity.LEFT) lp.leftMargin = horizontalMargin;
         if ((gravity & Gravity.TOP) == Gravity.TOP) lp.topMargin = verticalMargin;
         else lp.bottomMargin = verticalMargin;
+        parent.addView(view, lp);
+    }
+
+    private void addCenteredControl(FrameLayout parent, String label, int button, int width, int height, int bottomMargin, int xOffset) {
+        TextView view = makeButton(label, button);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        lp.bottomMargin = bottomMargin;
+        view.setTranslationX(xOffset);
         parent.addView(view, lp);
     }
 
