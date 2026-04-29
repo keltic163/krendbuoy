@@ -48,6 +48,7 @@ public class GameActivity extends Activity {
     private String romBaseName = "selected";
     private int displayMode = 0;
     private boolean debugTextVisible = false;
+    private int startupLoadStateSlot = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +57,10 @@ public class GameActivity extends Activity {
         audioBacklogSamples = getIntent().getIntExtra("audio_backlog_samples", -1);
         if (audioBacklogSamples != -1 && audioBacklogSamples != 1024 && audioBacklogSamples != 2048 && audioBacklogSamples != 4096) {
             audioBacklogSamples = -1;
+        }
+        startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
+        if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) {
+            startupLoadStateSlot = 0;
         }
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
         if (saveFolder != null && !saveFolder.isEmpty()) {
@@ -144,6 +149,7 @@ public class GameActivity extends Activity {
 
             NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
             importPortableSramIfAvailable();
+            loadStartupStateIfRequested();
             updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
             startAudioPlayback();
             startFrameLoop();
@@ -320,7 +326,7 @@ public class GameActivity extends Activity {
                 .setItems(labels, (dialog, which) -> {
                     int slot = which + 1;
                     if (save) {
-                        saveStateNow(slot);
+                        confirmAndSaveState(slot);
                     } else {
                         loadStateNow(slot);
                     }
@@ -357,6 +363,20 @@ public class GameActivity extends Activity {
         return new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(timestamp));
     }
 
+    private void confirmAndSaveState(int slot) {
+        if (getStateModifiedTime(slot) <= 0) {
+            saveStateNow(slot);
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Overwrite Save State")
+                .setMessage("Slot " + slot + " already has a save state.\n" + stateSlotLabel(slot) + "\n\nOverwrite it?")
+                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
     private void saveStateNow(int slot) {
         try {
             byte[] data = NativeBridge.exportState();
@@ -371,6 +391,23 @@ public class GameActivity extends Activity {
             }
         } catch (Throwable t) {
             showQuickNotice("Save State", "Save state failed:\n" + t.getMessage());
+        }
+    }
+
+    private void loadStartupStateIfRequested() {
+        if (startupLoadStateSlot <= 0) return;
+        int slot = startupLoadStateSlot;
+        startupLoadStateSlot = 0;
+        try {
+            byte[] data = readStateBytes(slot);
+            if (data == null || data.length == 0) {
+                updateInfo("Startup save state not found: Slot " + slot);
+                return;
+            }
+            boolean ok = NativeBridge.importState(data);
+            updateInfo(ok ? "Startup save state loaded: Slot " + slot : "Startup load state failed:\n" + NativeBridge.getLastError());
+        } catch (Throwable t) {
+            updateInfo("Startup load state failed:\n" + t.getMessage());
         }
     }
 
@@ -722,6 +759,7 @@ public class GameActivity extends Activity {
         int margin = dp(16);
         int gap = dp(8);
         int bottomPad = dp(88);
+        int shoulderBottomPad = dp(660);
 
         FrameLayout controls = new FrameLayout(this);
         controls.setClipChildren(false);
@@ -748,11 +786,13 @@ public class GameActivity extends Activity {
         addControl(controls, "A", NativeBridge.BUTTON_A, keySize, keySize,
                 Gravity.BOTTOM | Gravity.RIGHT, margin, bottomPad + keySize * 2 + gap * 2);
 
-        addCenteredControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, dp(66), -dp(54));
-        addCenteredControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, dp(66), dp(54));
+        addControl(controls, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
+                Gravity.BOTTOM | Gravity.LEFT, margin, shoulderBottomPad);
+        addControl(controls, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
+                Gravity.BOTTOM | Gravity.RIGHT, margin, shoulderBottomPad);
 
-        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(62));
-        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(62));
+        addCenteredControl(controls, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, dp(18), -dp(72));
+        addCenteredControl(controls, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, dp(18), dp(72));
     }
 
     private void addSystemControl(FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
