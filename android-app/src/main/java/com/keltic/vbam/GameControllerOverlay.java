@@ -1,5 +1,6 @@
 package com.krendstudio.krendbuoy;
 
+import android.app.Activity;
 import android.graphics.Color;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -29,7 +30,7 @@ final class GameControllerOverlay {
         return new String(new char[]{'C', 'h', 'e', 'a', 't', 's'});
     }
 
-    static void attach(GameActivity activity, FrameLayout root, Host host) {
+    static void attach(Activity activity, FrameLayout root, Host host) {
         int keySize = host.dp(58);
         int shoulderWidth = host.dp(76);
         int shoulderHeight = host.dp(42);
@@ -87,7 +88,7 @@ final class GameControllerOverlay {
                 Gravity.BOTTOM | Gravity.RIGHT, margin, host.dp(4), host::showGlobalSettingsDialog);
     }
 
-    private static void addSystemControl(GameActivity activity, FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
+    private static void addSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
         TextView view = makeSystemButton(activity, label, action);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
         if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
@@ -97,14 +98,14 @@ final class GameControllerOverlay {
         parent.addView(view, lp);
     }
 
-    private static void addCenteredSystemControl(GameActivity activity, FrameLayout parent, String label, int width, int height, int bottomMargin, Runnable action) {
+    private static void addCenteredSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int bottomMargin, Runnable action) {
         TextView view = makeSystemButton(activity, label, action);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         lp.bottomMargin = bottomMargin;
         parent.addView(view, lp);
     }
 
-    private static void addControl(GameActivity activity, FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {
+    private static void addControl(Activity activity, FrameLayout parent, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin) {
         TextView view = makeButton(activity, label, button);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
         if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
@@ -114,7 +115,7 @@ final class GameControllerOverlay {
         parent.addView(view, lp);
     }
 
-    private static void addCenteredControl(GameActivity activity, FrameLayout parent, String label, int button, int width, int height, int bottomMargin, int xOffset) {
+    private static void addCenteredControl(Activity activity, FrameLayout parent, String label, int button, int width, int height, int bottomMargin, int xOffset) {
         TextView view = makeButton(activity, label, button);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         lp.bottomMargin = bottomMargin;
@@ -122,7 +123,7 @@ final class GameControllerOverlay {
         parent.addView(view, lp);
     }
 
-    private static TextView makeSystemButton(GameActivity activity, String label, Runnable action) {
+    private static TextView makeSystemButton(Activity activity, String label, Runnable action) {
         TextView view = new TextView(activity);
         view.setText(label);
         view.setTextSize(13f);
@@ -134,7 +135,7 @@ final class GameControllerOverlay {
         return view;
     }
 
-    private static TextView makeButton(GameActivity activity, String label, int button) {
+    private static TextView makeButton(Activity activity, String label, int button) {
         TextView view = new TextView(activity);
         view.setText(label);
         view.setTextSize(label.length() > 1 ? 13f : 22f);
