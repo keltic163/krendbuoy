@@ -1,5 +1,6 @@
 package com.krendstudio.krendbuoy;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 
 /**
@@ -21,7 +22,7 @@ final class GameQuickMenu {
     private GameQuickMenu() {
     }
 
-    static void show(GameActivity activity, Host host) {
+    static void show(Activity activity, Host host) {
         host.pauseEmulationForMenu();
         host.releaseAllButtons();
 
