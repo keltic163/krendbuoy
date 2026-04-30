@@ -16,6 +16,7 @@ import java.util.Date;
 import java.util.Locale;
 
 final class SaveStateManager {
+    static final int SLOT_COUNT = 10;
     private static final String STATE_DIR_NAME = "KrendBuoy States";
     private final Activity activity;
     private final Uri portableSaveFolderUri;
