@@ -87,6 +87,14 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (!finishingFromMenu && !restarting && !menuPaused && frameLoopManager != null && frameLoopManager.isRunning()) {
+            startAudioPlayback();
+        }
+    }
+
+    @Override
     protected void onPause() {
         NativeBridge.saveSram();
         exportPortableSramIfEnabled();
