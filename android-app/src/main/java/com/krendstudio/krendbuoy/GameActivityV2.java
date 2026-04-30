@@ -12,10 +12,10 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class GameActivityV2 extends Activity implements GameControllerOverlay.Host, GameQuickMenu.Host, GameSettingsDialogs.Host, FrameLoopManager.Host, PortableSaveManager.Host {
     private TextView info;
-    private TextView toastView;
     private ImageView screen;
     private Uri currentRomUri;
     private volatile boolean finishingFromMenu;
@@ -83,7 +83,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         applyDisplayMode();
 
         GameControllerOverlay.attach(this, root, this);
-        attachToastOverlay(root);
         setContentView(root);
         new Thread(() -> prepareAndStart(currentRomUri), "KrendBuoy-prepare-v2").start();
     }
@@ -262,9 +261,24 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         new AlertDialog.Builder(this)
                 .setTitle(save ? "Save State" : "Load State")
                 .setItems(labels, (dialog, which) -> {
-                    if (save) saveStateNow(which + 1);
+                    if (save) confirmAndSaveState(which + 1);
                     else loadStateNow(which + 1);
                 })
+                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
+                .show();
+    }
+
+    private void confirmAndSaveState(int slot) {
+        pauseEmulationForMenu();
+        if (saveStateManager.getModifiedTime(slot) <= 0) {
+            saveStateNow(slot);
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Overwrite Save State")
+                .setMessage("Slot " + slot + " already has a save state.\n" + saveStateManager.slotLabel(slot) + "\n\nOverwrite it?")
+                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))
                 .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
@@ -273,10 +287,10 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private void saveStateNow(int slot) {
         try {
             byte[] data = NativeBridge.exportState();
-            if (saveStateManager.write(data, slot)) showToastOverlay("Saved Slot " + slot);
-            else showToastOverlay("Save state write failed");
+            if (saveStateManager.write(data, slot)) showToast("Saved Slot " + slot);
+            else showToast("Save state write failed");
         } catch (Throwable t) {
-            showToastOverlay("Save state failed: " + safeMessage(t));
+            showToast("Save state failed: " + safeMessage(t));
         }
         resumeEmulationFromMenu();
     }
@@ -302,14 +316,14 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         try {
             byte[] data = saveStateManager.read(slot);
             if (data == null || data.length == 0) {
-                showToastOverlay("Slot " + slot + " is empty");
+                showToast("Slot " + slot + " is empty");
                 resumeEmulationFromMenu();
                 return;
             }
             boolean ok = NativeBridge.importState(data);
-            showToastOverlay(ok ? "Loaded Slot " + slot : "Load state failed");
+            showToast(ok ? "Loaded Slot " + slot : "Load state failed");
         } catch (Throwable t) {
-            showToastOverlay("Load state failed: " + safeMessage(t));
+            showToast("Load state failed: " + safeMessage(t));
         }
         resumeEmulationFromMenu();
     }
@@ -380,37 +394,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         updateInfo("Display mode: " + AppSettingsManager.displayModeLabel(displayMode));
     }
 
-    private void attachToastOverlay(FrameLayout root) {
-        toastView = new TextView(this);
-        toastView.setTextSize(14f);
-        toastView.setTextColor(Color.WHITE);
-        toastView.setGravity(Gravity.CENTER);
-        toastView.setPadding(dp(14), dp(8), dp(14), dp(8));
-        toastView.setBackgroundColor(0xCC000000);
-        toastView.setAlpha(0f);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL
-        );
-        lp.topMargin = dp(82);
-        root.addView(toastView, lp);
-        toastView.bringToFront();
-    }
-
-    private void showToastOverlay(String message) {
-        runOnUiThread(() -> {
-            if (toastView == null) return;
-            toastView.animate().cancel();
-            toastView.setText(message);
-            toastView.setAlpha(1f);
-            toastView.bringToFront();
-            toastView.animate()
-                    .alpha(0f)
-                    .setStartDelay(1200)
-                    .setDuration(400)
-                    .start();
-        });
+    private void showToast(String message) {
+        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_SHORT).show());
     }
 
     private void showQuickNotice(String title, String message) {
