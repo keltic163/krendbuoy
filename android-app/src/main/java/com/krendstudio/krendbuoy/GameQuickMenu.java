@@ -31,8 +31,7 @@ final class GameQuickMenu {
                 "Restart Game",
                 "Return to Main Menu",
                 "Display Settings",
-                "Audio Preset",
-                "Exit Game"
+                "Audio Preset"
         };
 
         new AlertDialog.Builder(activity)
@@ -49,8 +48,6 @@ final class GameQuickMenu {
                         host.showDisplaySettingsDialog();
                     } else if (which == 4) {
                         host.showAudioPresetDialog();
-                    } else if (which == 5) {
-                        host.leaveGame();
                     }
                 })
                 .setOnCancelListener(dialog -> host.resumeEmulationFromMenu())
