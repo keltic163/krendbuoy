@@ -3,7 +3,7 @@ set -euo pipefail
 
 print_help() {
   cat <<'EOF'
-Build the VBA-M libretro core for RetroArch Android.
+Build the VBA-M libretro core used by the KrendBuoy Android APK.
 
 Usage:
   scripts/build-android-libretro.sh [ABI]
@@ -26,7 +26,8 @@ Output:
   build/android/<abi>/vbam_libretro.so
   build/android/<abi>/README.txt
 
-This builds only the libretro core. It does not create a standalone Android app.
+The APK workflow copies the output to:
+  android-app/src/main/jniLibs/<abi>/libvbam_libretro.so
 EOF
 }
 
@@ -108,7 +109,7 @@ fi
 OUT_DIR="$ROOT_DIR/build/android/$ABI"
 mkdir -p "$OUT_DIR"
 
-printf 'Building Android libretro core\n'
+printf 'Building KrendBuoy Android libretro core\n'
 printf '  ABI: %s\n' "$ABI"
 printf '  API: %s\n' "$ANDROID_API"
 printf '  NDK: %s\n' "$NDK"
@@ -138,22 +139,15 @@ if [[ -x "$STRIP_BIN" ]]; then
 fi
 
 cat > "$OUT_DIR/README.txt" <<EOF
-VBA-M libretro core for RetroArch Android
+VBA-M libretro core for the KrendBuoy Android APK
 
 ABI: $ABI
 Android API: $ANDROID_API
 
-This artifact contains vbam_libretro.so, a RetroArch-compatible libretro core.
-It is not a standalone Android application.
+The APK build copies this file to:
+android-app/src/main/jniLibs/$ABI/libvbam_libretro.so
 
-To test:
-1. Copy vbam_libretro.so to your Android device.
-2. Open RetroArch Android.
-3. Load the core manually if needed.
-4. Load a legally obtained Game Boy or Game Boy Advance ROM.
-
-If RetroArch rejects the file, confirm that the artifact ABI matches your device.
-Most modern Android phones use arm64-v8a.
+This core is loaded by com.krendstudio.krendbuoy.NativeBridge.
 EOF
 
 printf 'Built: %s\n' "$OUT_DIR/vbam_libretro.so"
