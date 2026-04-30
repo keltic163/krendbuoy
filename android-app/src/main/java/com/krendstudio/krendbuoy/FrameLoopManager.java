@@ -9,6 +9,7 @@ final class FrameLoopManager {
         void updateFrameInfo(String text);
         void runOnUiThread(Runnable action);
         String audioPresetLabelForFrameLoop();
+        int emulationSpeedMultiplierForFrameLoop();
     }
 
     private final Host host;
@@ -33,15 +34,30 @@ final class FrameLoopManager {
                 }
 
                 long start = System.currentTimeMillis();
-                if (NativeBridge.runFrame()) {
-                    int width = NativeBridge.getFrameWidth();
-                    int height = NativeBridge.getFrameHeight();
-                    int[] pixels = NativeBridge.copyFramePixels();
+                int speed = host.emulationSpeedMultiplierForFrameLoop();
+                if (speed < 1 || speed > 3) speed = 1;
+
+                boolean ok = true;
+                int width = 0;
+                int height = 0;
+                int[] pixels = null;
+
+                for (int i = 0; i < speed && running; i++) {
+                    if (!NativeBridge.runFrame()) {
+                        ok = false;
+                        break;
+                    }
+                    width = NativeBridge.getFrameWidth();
+                    height = NativeBridge.getFrameHeight();
+                    pixels = NativeBridge.copyFramePixels();
+                    frame++;
+                }
+
+                if (ok) {
                     if (width > 0 && height > 0 && pixels != null && pixels.length == width * height) {
                         Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
                         host.runOnUiThread(() -> screen.setImageBitmap(bitmap));
                     }
-                    frame++;
                     if (frame % 30 == 0) {
                         host.updateFrameInfo("audio preset " + host.audioPresetLabelForFrameLoop() + "\n" + NativeBridge.getLastError());
                     }
