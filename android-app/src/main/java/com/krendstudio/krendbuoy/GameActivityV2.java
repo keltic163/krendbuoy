@@ -20,6 +20,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private volatile boolean finishingFromMenu;
     private volatile boolean menuPaused;
     private volatile boolean restarting;
+    private volatile int emulationSpeedMultiplier = 1;
     private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
     private AppSettingsManager settingsManager;
@@ -122,7 +123,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
         importPortableSramIfAvailable();
         loadStartupStateIfRequested();
-        updateInfo("Running... audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+        updateInfo("Running... speed " + emulationSpeedLabel() + " audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
         menuPaused = false;
         restarting = false;
         startAudioPlayback();
@@ -168,6 +169,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     @Override
+    public int emulationSpeedMultiplierForFrameLoop() {
+        return emulationSpeedMultiplier;
+    }
+
+    @Override
     public void updateFrameInfo(String text) {
         updateInfo(text);
     }
@@ -175,6 +181,17 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public String audioPresetLabelForFrameLoop() {
         return AppSettingsManager.audioPresetLabel(audioBacklogSamples);
+    }
+
+    @Override
+    public void cycleEmulationSpeed() {
+        emulationSpeedMultiplier = emulationSpeedMultiplier >= 3 ? 1 : emulationSpeedMultiplier + 1;
+        updateInfo("Speed " + emulationSpeedLabel());
+    }
+
+    @Override
+    public String emulationSpeedLabel() {
+        return emulationSpeedMultiplier + "x";
     }
 
     @Override
