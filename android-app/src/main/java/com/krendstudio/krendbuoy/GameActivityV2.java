@@ -22,12 +22,13 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private volatile boolean restarting;
     private FrameLoopManager frameLoopManager;
     private final AudioPlaybackManager audioPlaybackManager = new AudioPlaybackManager();
+    private AppSettingsManager settingsManager;
     private RomSessionManager romSessionManager;
     private PortableSaveManager portableSaveManager;
-    private int audioBacklogSamples = -1;
+    private int audioBacklogSamples = AppSettingsManager.AUDIO_DYNAMIC;
     private Uri portableSaveFolderUri;
     private String romBaseName = "selected";
-    private int displayMode = 0;
+    private int displayMode = AppSettingsManager.DISPLAY_FIT;
     private boolean debugTextVisible = false;
     private int startupLoadStateSlot = 0;
     private SaveStateManager saveStateManager;
@@ -35,9 +36,12 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        settingsManager = new AppSettingsManager(this);
         currentRomUri = getIntent().getData();
         romSessionManager = new RomSessionManager(this);
-        audioBacklogSamples = normalizeAudioPreset(getIntent().getIntExtra("audio_backlog_samples", -1));
+        audioBacklogSamples = settingsManager.getAudioPreset();
+        displayMode = settingsManager.getDisplayMode();
+        debugTextVisible = settingsManager.isDebugTextVisible();
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > 5) startupLoadStateSlot = 0;
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
@@ -74,6 +78,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         info.setGravity(Gravity.CENTER);
         info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
         content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        applyDisplayMode();
 
         GameControllerOverlay.attach(this, root, this);
         setContentView(root);
@@ -117,7 +122,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
         importPortableSramIfAvailable();
         loadStartupStateIfRequested();
-        updateInfo("Running... audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+        updateInfo("Running... audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
         menuPaused = false;
         restarting = false;
         startAudioPlayback();
@@ -169,7 +174,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public String audioPresetLabelForFrameLoop() {
-        return audioPresetLabel(audioBacklogSamples);
+        return AppSettingsManager.audioPresetLabel(audioBacklogSamples);
     }
 
     @Override
@@ -303,9 +308,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .setItems(labels, (dialog, which) -> {
                     if (which <= 2) {
                         displayMode = which;
+                        settingsManager.setDisplayMode(displayMode);
                         applyDisplayMode();
                     } else {
                         debugTextVisible = !debugTextVisible;
+                        settingsManager.setDebugTextVisible(debugTextVisible);
                         info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
                     }
                     resumeEmulationFromMenu();
@@ -319,15 +326,16 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     public void showAudioPresetDialog() {
         pauseEmulationForMenu();
         String[] labels = {"Dynamic - recommended", "1024 - ultra low latency, may crackle", "2048 - low latency", "4096 - balanced"};
-        int[] values = {-1, 1024, 2048, 4096};
+        int[] values = {AppSettingsManager.AUDIO_DYNAMIC, AppSettingsManager.AUDIO_1024, AppSettingsManager.AUDIO_2048, AppSettingsManager.AUDIO_4096};
         int checked = 0;
         for (int i = 0; i < values.length; i++) if (values[i] == audioBacklogSamples) checked = i;
         new AlertDialog.Builder(this)
                 .setTitle("Audio Preset")
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     audioBacklogSamples = values[which];
+                    settingsManager.setAudioPreset(audioBacklogSamples);
                     NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
-                    updateInfo("audio preset " + audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+                    updateInfo("audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
                     dialog.dismiss();
                 })
                 .setNegativeButton("Cancel", null)
@@ -352,9 +360,9 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void applyDisplayMode() {
-        screen.setAdjustViewBounds(displayMode != 2);
-        screen.setScaleType(displayMode == 2 ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
-        updateInfo("Display mode: " + (displayMode == 1 ? "Original Ratio" : displayMode == 2 ? "Stretch" : "Fit Screen"));
+        screen.setAdjustViewBounds(displayMode != AppSettingsManager.DISPLAY_STRETCH);
+        screen.setScaleType(displayMode == AppSettingsManager.DISPLAY_STRETCH ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
+        updateInfo("Display mode: " + AppSettingsManager.displayModeLabel(displayMode));
     }
 
     private void showQuickNotice(String title, String message) {
@@ -366,14 +374,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .setPositiveButton("OK", null)
                 .setOnDismissListener(dialog -> resumeEmulationFromMenu())
                 .show());
-    }
-
-    private int normalizeAudioPreset(int value) {
-        return value == 1024 || value == 2048 || value == 4096 ? value : -1;
-    }
-
-    private String audioPresetLabel(int value) {
-        return value == 1024 ? "1024" : value == 2048 ? "2048" : value == 4096 ? "4096" : "Dynamic";
     }
 
     private void importPortableSramIfAvailable() {
