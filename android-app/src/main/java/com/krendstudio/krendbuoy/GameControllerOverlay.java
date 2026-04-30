@@ -19,6 +19,8 @@ final class GameControllerOverlay {
         void showControllerSettingsDialog();
         void showGlobalSettingsDialog();
         void showUnavailableFeature(String title, String message);
+        void cycleEmulationSpeed();
+        String emulationSpeedLabel();
         int dp(int value);
     }
 
@@ -63,6 +65,14 @@ final class GameControllerOverlay {
                 Gravity.TOP | Gravity.RIGHT, margin + menuWidth + host.dp(8), host.dp(8), () -> host.showStateSlotDialog(false));
         addSystemControl(activity, root, "Menu", menuWidth, menuHeight,
                 Gravity.TOP | Gravity.RIGHT, margin, host.dp(8), host::showQuickMenu);
+        TextView speed = addSystemControl(activity, root, "Speed " + host.emulationSpeedLabel(), menuWidth, menuHeight,
+                Gravity.TOP | Gravity.LEFT, margin, host.dp(8), () -> {
+                    host.cycleEmulationSpeed();
+                });
+        speed.setOnClickListener(v -> {
+            host.cycleEmulationSpeed();
+            speed.setText("Speed " + host.emulationSpeedLabel());
+        });
 
         FrameLayout panel = new FrameLayout(activity);
         panel.setClipChildren(false);
@@ -247,7 +257,7 @@ final class GameControllerOverlay {
         buttons.add(new VirtualButton(view, button));
     }
 
-    private static void addSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
+    private static TextView addSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
         TextView view = makeSystemButton(activity, label, action);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
         if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
@@ -255,6 +265,7 @@ final class GameControllerOverlay {
         if ((gravity & Gravity.TOP) == Gravity.TOP) lp.topMargin = verticalMargin;
         else lp.bottomMargin = verticalMargin;
         parent.addView(view, lp);
+        return view;
     }
 
     private static void addSystemButtonByCenter(Activity activity, FrameLayout parent, String label, int width, int height, float centerX, float centerY, Runnable action) {
