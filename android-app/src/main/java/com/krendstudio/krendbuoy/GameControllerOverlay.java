@@ -106,10 +106,7 @@ final class GameControllerOverlay {
         int bottomButtonWidth = Math.max(host.dp(104), Math.min(host.dp(136), Math.round(w * 0.26f)));
         int bottomButtonHeight = host.dp(44);
 
-        TextView dpadPad = makeButton(activity, "");
-        dpadPad.setText("↑\n←  →\n↓");
-        dpadPad.setTextSize(24f);
-        dpadPad.setBackgroundColor(0x88333333);
+        FrameLayout dpadPad = makeDpadPad(activity, host, dpadSize);
         placeByCenter(panel, dpadPad, dpadSize, dpadSize, w * 0.27f, h * 0.55f);
 
         addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, w * 0.64f, h * 0.62f);
@@ -131,6 +128,30 @@ final class GameControllerOverlay {
             updateVirtualButtons(actionButtons, event);
             return true;
         });
+    }
+
+    private static FrameLayout makeDpadPad(Activity activity, Host host, int dpadSize) {
+        FrameLayout pad = new FrameLayout(activity);
+        pad.setBackgroundColor(0x66333333);
+        pad.setAlpha(0.85f);
+        int arrowSize = Math.max(host.dp(42), Math.round(dpadSize * 0.30f));
+        int offset = Math.round(dpadSize * 0.34f);
+        addDpadArrow(activity, pad, "↑", arrowSize, dpadSize / 2f, dpadSize / 2f - offset);
+        addDpadArrow(activity, pad, "↓", arrowSize, dpadSize / 2f, dpadSize / 2f + offset);
+        addDpadArrow(activity, pad, "←", arrowSize, dpadSize / 2f - offset, dpadSize / 2f);
+        addDpadArrow(activity, pad, "→", arrowSize, dpadSize / 2f + offset, dpadSize / 2f);
+        return pad;
+    }
+
+    private static void addDpadArrow(Activity activity, FrameLayout parent, String label, int size, float centerX, float centerY) {
+        TextView arrow = new TextView(activity);
+        arrow.setText(label);
+        arrow.setTextSize(24f);
+        arrow.setTextColor(Color.WHITE);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setBackgroundColor(0x00000000);
+        arrow.setAlpha(0.9f);
+        placeByCenter(parent, arrow, size, size, centerX, centerY);
     }
 
     private static void updateDpad(View dpad, DpadState state, MotionEvent event) {
