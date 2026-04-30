@@ -102,11 +102,11 @@ final class GameControllerOverlay {
         dpadPad.setBackgroundColor(0x88333333);
         placeByCenter(panel, dpadPad, dpadSize, dpadSize, w * 0.27f, h * 0.55f);
 
-        addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, w * 0.67f, h * 0.62f);
-        addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, w * 0.82f, h * 0.48f);
+        addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, w * 0.64f, h * 0.62f);
+        addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, w * 0.85f, h * 0.48f);
 
-        addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * 0.67f, h * 0.31f);
-        addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * 0.82f, h * 0.31f);
+        addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * 0.62f, h * 0.31f);
+        addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * 0.86f, h * 0.31f);
 
         addActionButton(activity, panel, actionButtons, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * 0.43f, h * 0.79f);
         addActionButton(activity, panel, actionButtons, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * 0.57f, h * 0.79f);
