@@ -393,8 +393,8 @@ public class MainActivity extends Activity {
     }
 
     private void showLoadStateSlotDialog(RomEntry entry) {
-        String[] labels = new String[5];
-        for (int slot = 1; slot <= 5; slot++) labels[slot - 1] = stateSlotLabel(entry.baseName, slot);
+        String[] labels = new String[SaveStateManager.SLOT_COUNT];
+        for (int slot = 1; slot <= SaveStateManager.SLOT_COUNT; slot++) labels[slot - 1] = stateSlotLabel(entry.baseName, slot);
         new AlertDialog.Builder(this).setTitle("Load State Slot").setItems(labels, (dialog, which) -> {
             int slot = which + 1;
             if (!stateSlotExists(entry.baseName, slot)) {
@@ -442,7 +442,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean hasRootSaveFile(String baseName) { return findRootChild(baseName + ".sav") != null || findRootChild(baseName + ".srm") != null; }
-    private int countStateFiles(String baseName) { int count = 0; for (int slot = 1; slot <= 5; slot++) if (stateSlotExists(baseName, slot)) count++; return count; }
+    private int countStateFiles(String baseName) { int count = 0; for (int slot = 1; slot <= SaveStateManager.SLOT_COUNT; slot++) if (stateSlotExists(baseName, slot)) count++; return count; }
     private boolean stateSlotExists(String baseName, int slot) { return getStateModifiedTime(baseName, slot) > 0; }
     private boolean isFavorite(String baseName) { return prefs.getStringSet(KEY_FAVORITES, Collections.emptySet()).contains(sanitizeFileName(baseName)); }
 
