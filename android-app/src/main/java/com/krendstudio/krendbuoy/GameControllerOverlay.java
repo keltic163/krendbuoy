@@ -105,8 +105,8 @@ final class GameControllerOverlay {
         addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, w * 0.67f, h * 0.62f);
         addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, w * 0.82f, h * 0.48f);
 
-        addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * 0.42f, h * 0.17f);
-        addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * 0.58f, h * 0.17f);
+        addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * 0.67f, h * 0.31f);
+        addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * 0.82f, h * 0.31f);
 
         addActionButton(activity, panel, actionButtons, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * 0.43f, h * 0.79f);
         addActionButton(activity, panel, actionButtons, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * 0.57f, h * 0.79f);
@@ -153,10 +153,10 @@ final class GameControllerOverlay {
             return;
         }
 
-        float left = dpad.getLeft() + dpad.getTranslationX();
-        float top = dpad.getTop() + dpad.getTranslationY();
-        float cx = left + dpad.getWidth() / 2f;
-        float cy = top + dpad.getHeight() / 2f;
+        float dpadLeft = dpad.getLeft() + dpad.getTranslationX();
+        float dpadTop = dpad.getTop() + dpad.getTranslationY();
+        float cx = dpadLeft + dpad.getWidth() / 2f;
+        float cy = dpadTop + dpad.getHeight() / 2f;
         float dx = chosenX - cx;
         float dy = chosenY - cy;
         float deadZone = Math.min(dpad.getWidth(), dpad.getHeight()) * 0.16f;
@@ -168,11 +168,11 @@ final class GameControllerOverlay {
         }
 
         double degrees = Math.toDegrees(Math.atan2(dy, dx));
-        boolean right = degrees >= -67.5 && degrees <= 67.5;
-        boolean down = degrees >= 22.5 && degrees <= 157.5;
-        boolean left = degrees >= 112.5 || degrees <= -112.5;
-        boolean up = degrees >= -157.5 && degrees <= -22.5;
-        setDpadState(state, up, down, left, right);
+        boolean pressRight = degrees >= -67.5 && degrees <= 67.5;
+        boolean pressDown = degrees >= 22.5 && degrees <= 157.5;
+        boolean pressLeft = degrees >= 112.5 || degrees <= -112.5;
+        boolean pressUp = degrees >= -157.5 && degrees <= -22.5;
+        setDpadState(state, pressUp, pressDown, pressLeft, pressRight);
         dpad.setAlpha(1.0f);
     }
 
