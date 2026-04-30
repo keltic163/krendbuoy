@@ -223,6 +223,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void showStateSlotDialog(boolean save) {
+        pauseEmulationForMenu();
         if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
         String[] labels = new String[5];
         for (int i = 0; i < labels.length; i++) labels[i] = saveStateManager.slotLabel(i + 1);
@@ -238,6 +239,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void confirmAndSaveState(int slot) {
+        pauseEmulationForMenu();
         if (saveStateManager.getModifiedTime(slot) <= 0) {
             saveStateNow(slot);
             return;
@@ -294,6 +296,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void showDisplaySettingsDialog() {
+        pauseEmulationForMenu();
         String[] labels = {"Fit Screen", "Original Ratio", "Stretch", debugTextVisible ? "Hide Debug Text" : "Show Debug Text"};
         new AlertDialog.Builder(this)
                 .setTitle("Display Settings")
@@ -314,6 +317,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public void showAudioPresetDialog() {
+        pauseEmulationForMenu();
         String[] labels = {"Dynamic - recommended", "1024 - ultra low latency, may crackle", "2048 - low latency", "4096 - balanced"};
         int[] values = {-1, 1024, 2048, 4096};
         int checked = 0;
@@ -354,6 +358,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void showQuickNotice(String title, String message) {
+        pauseEmulationForMenu();
         updateInfo(message);
         runOnUiThread(() -> new AlertDialog.Builder(this)
                 .setTitle(title)
