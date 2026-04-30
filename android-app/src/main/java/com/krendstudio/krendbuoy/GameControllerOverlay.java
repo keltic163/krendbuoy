@@ -33,6 +33,13 @@ final class GameControllerOverlay {
         }
     }
 
+    private static final class DpadState {
+        boolean up;
+        boolean down;
+        boolean left;
+        boolean right;
+    }
+
     private GameControllerOverlay() {
     }
 
@@ -41,15 +48,9 @@ final class GameControllerOverlay {
     }
 
     static void attach(Activity activity, FrameLayout root, Host host) {
-        int keySize = host.dp(62);
-        int shoulderWidth = host.dp(82);
-        int shoulderHeight = host.dp(42);
         int menuWidth = host.dp(88);
         int menuHeight = host.dp(38);
-        int startSelectWidth = host.dp(70);
-        int startSelectHeight = host.dp(32);
         int margin = host.dp(20);
-        int gap = host.dp(10);
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels - host.dp(16);
         int screenHeight = Math.round(screenWidth * 2f / 3f);
@@ -74,44 +75,124 @@ final class GameControllerOverlay {
         panelLp.topMargin = panelTop;
         root.addView(panel, panelLp);
 
-        List<VirtualButton> virtualButtons = new ArrayList<>();
+        List<VirtualButton> actionButtons = new ArrayList<>();
+        DpadState dpadState = new DpadState();
 
-        addControl(activity, panel, virtualButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL, host.dp(0), host.dp(30), -host.dp(58));
-        addControl(activity, panel, virtualButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL, host.dp(0), host.dp(30), host.dp(58));
+        panel.post(() -> buildMeasuredPanel(activity, panel, host, actionButtons, dpadState));
+    }
 
-        int dpadBottom = host.dp(108);
-        addControl(activity, panel, virtualButtons, "↑", NativeBridge.BUTTON_UP, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, dpadBottom + keySize + gap, 0);
-        addControl(activity, panel, virtualButtons, "←", NativeBridge.BUTTON_LEFT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin, dpadBottom, 0);
-        addControl(activity, panel, virtualButtons, "→", NativeBridge.BUTTON_RIGHT, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize * 2 + gap * 2, dpadBottom, 0);
-        addControl(activity, panel, virtualButtons, "↓", NativeBridge.BUTTON_DOWN, keySize, keySize,
-                Gravity.BOTTOM | Gravity.LEFT, margin + keySize + gap, dpadBottom - keySize - gap, 0);
+    private static void buildMeasuredPanel(Activity activity, FrameLayout panel, Host host, List<VirtualButton> actionButtons, DpadState dpadState) {
+        int w = panel.getWidth();
+        int h = panel.getHeight();
+        if (w <= 0 || h <= 0) return;
 
-        addControl(activity, panel, virtualButtons, "B", NativeBridge.BUTTON_B, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin + keySize + gap + host.dp(28), dpadBottom - host.dp(2), 0);
-        addControl(activity, panel, virtualButtons, "A", NativeBridge.BUTTON_A, keySize, keySize,
-                Gravity.BOTTOM | Gravity.RIGHT, margin, dpadBottom + keySize - host.dp(4), 0);
+        int unit = Math.max(host.dp(52), Math.min(host.dp(72), Math.round(w * 0.115f)));
+        int dpadSize = unit * 3;
+        int actionSize = Math.max(host.dp(58), Math.min(host.dp(76), Math.round(w * 0.125f)));
+        int shoulderWidth = Math.max(host.dp(78), Math.min(host.dp(104), Math.round(w * 0.18f)));
+        int shoulderHeight = host.dp(42);
+        int startSelectWidth = Math.max(host.dp(62), Math.min(host.dp(84), Math.round(w * 0.14f)));
+        int startSelectHeight = host.dp(32);
+        int bottomButtonWidth = Math.max(host.dp(104), Math.min(host.dp(136), Math.round(w * 0.26f)));
+        int bottomButtonHeight = host.dp(44);
 
-        addControl(activity, panel, virtualButtons, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, host.dp(0), host.dp(68), -host.dp(46));
-        addControl(activity, panel, virtualButtons, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, host.dp(0), host.dp(68), host.dp(46));
+        TextView dpadPad = makeButton(activity, "");
+        dpadPad.setText("↑\n←  →\n↓");
+        dpadPad.setTextSize(24f);
+        dpadPad.setBackgroundColor(0x88333333);
+        placeByCenter(panel, dpadPad, dpadSize, dpadSize, w * 0.27f, h * 0.55f);
 
-        addSystemControl(activity, panel, "Controller", host.dp(112), host.dp(44),
-                Gravity.BOTTOM | Gravity.LEFT, margin, host.dp(4), host::showControllerSettingsDialog);
-        addCenteredSystemControl(activity, panel, centerFeatureLabel(), host.dp(104), host.dp(44), host.dp(4),
+        addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, w * 0.67f, h * 0.62f);
+        addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, w * 0.82f, h * 0.48f);
+
+        addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * 0.42f, h * 0.17f);
+        addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * 0.58f, h * 0.17f);
+
+        addActionButton(activity, panel, actionButtons, "Select", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * 0.43f, h * 0.79f);
+        addActionButton(activity, panel, actionButtons, "Start", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * 0.57f, h * 0.79f);
+
+        addSystemButtonByCenter(activity, panel, "Controller", bottomButtonWidth, bottomButtonHeight, w * 0.20f, h - bottomButtonHeight / 2f - host.dp(6), host::showControllerSettingsDialog);
+        addSystemButtonByCenter(activity, panel, centerFeatureLabel(), bottomButtonWidth, bottomButtonHeight, w * 0.50f, h - bottomButtonHeight / 2f - host.dp(6),
                 () -> host.showUnavailableFeature(centerFeatureLabel(), "This feature is not implemented yet."));
-        addSystemControl(activity, panel, "Settings", host.dp(112), host.dp(44),
-                Gravity.BOTTOM | Gravity.RIGHT, margin, host.dp(4), host::showGlobalSettingsDialog);
+        addSystemButtonByCenter(activity, panel, "Settings", bottomButtonWidth, bottomButtonHeight, w * 0.80f, h - bottomButtonHeight / 2f - host.dp(6), host::showGlobalSettingsDialog);
 
         panel.setOnTouchListener((view, event) -> {
-            updateVirtualButtons(virtualButtons, event);
+            updateDpad(dpadPad, dpadState, event);
+            updateVirtualButtons(actionButtons, event);
             return true;
         });
+    }
+
+    private static void updateDpad(View dpad, DpadState state, MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            setDpadState(state, false, false, false, false);
+            dpad.setAlpha(0.85f);
+            return;
+        }
+
+        int actionIndex = event.getActionIndex();
+        boolean pointerUp = action == MotionEvent.ACTION_POINTER_UP;
+        boolean found = false;
+        float chosenX = 0;
+        float chosenY = 0;
+
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            if (pointerUp && i == actionIndex) continue;
+            if (isInside(event.getX(i), event.getY(i), dpad)) {
+                chosenX = event.getX(i);
+                chosenY = event.getY(i);
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            setDpadState(state, false, false, false, false);
+            dpad.setAlpha(0.85f);
+            return;
+        }
+
+        float left = dpad.getLeft() + dpad.getTranslationX();
+        float top = dpad.getTop() + dpad.getTranslationY();
+        float cx = left + dpad.getWidth() / 2f;
+        float cy = top + dpad.getHeight() / 2f;
+        float dx = chosenX - cx;
+        float dy = chosenY - cy;
+        float deadZone = Math.min(dpad.getWidth(), dpad.getHeight()) * 0.16f;
+
+        if (Math.hypot(dx, dy) < deadZone) {
+            setDpadState(state, false, false, false, false);
+            dpad.setAlpha(0.85f);
+            return;
+        }
+
+        double degrees = Math.toDegrees(Math.atan2(dy, dx));
+        boolean right = degrees >= -67.5 && degrees <= 67.5;
+        boolean down = degrees >= 22.5 && degrees <= 157.5;
+        boolean left = degrees >= 112.5 || degrees <= -112.5;
+        boolean up = degrees >= -157.5 && degrees <= -22.5;
+        setDpadState(state, up, down, left, right);
+        dpad.setAlpha(1.0f);
+    }
+
+    private static void setDpadState(DpadState state, boolean up, boolean down, boolean left, boolean right) {
+        if (state.up != up) {
+            state.up = up;
+            NativeBridge.setButtonState(NativeBridge.BUTTON_UP, up);
+        }
+        if (state.down != down) {
+            state.down = down;
+            NativeBridge.setButtonState(NativeBridge.BUTTON_DOWN, down);
+        }
+        if (state.left != left) {
+            state.left = left;
+            NativeBridge.setButtonState(NativeBridge.BUTTON_LEFT, left);
+        }
+        if (state.right != right) {
+            state.right = right;
+            NativeBridge.setButtonState(NativeBridge.BUTTON_RIGHT, right);
+        }
     }
 
     private static void updateVirtualButtons(List<VirtualButton> buttons, MotionEvent event) {
@@ -156,6 +237,16 @@ final class GameControllerOverlay {
         button.view.setAlpha(pressed ? 1.0f : 0.85f);
     }
 
+    private static void addActionButton(Activity activity, FrameLayout parent, List<VirtualButton> buttons, String label, int button, int size, float centerX, float centerY) {
+        addActionButton(activity, parent, buttons, label, button, size, size, centerX, centerY);
+    }
+
+    private static void addActionButton(Activity activity, FrameLayout parent, List<VirtualButton> buttons, String label, int button, int width, int height, float centerX, float centerY) {
+        TextView view = makeButton(activity, label);
+        placeByCenter(parent, view, width, height, centerX, centerY);
+        buttons.add(new VirtualButton(view, button));
+    }
+
     private static void addSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int gravity, int horizontalMargin, int verticalMargin, Runnable action) {
         TextView view = makeSystemButton(activity, label, action);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
@@ -166,23 +257,16 @@ final class GameControllerOverlay {
         parent.addView(view, lp);
     }
 
-    private static void addCenteredSystemControl(Activity activity, FrameLayout parent, String label, int width, int height, int bottomMargin, Runnable action) {
+    private static void addSystemButtonByCenter(Activity activity, FrameLayout parent, String label, int width, int height, float centerX, float centerY, Runnable action) {
         TextView view = makeSystemButton(activity, label, action);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        lp.bottomMargin = bottomMargin;
-        parent.addView(view, lp);
+        placeByCenter(parent, view, width, height, centerX, centerY);
     }
 
-    private static void addControl(Activity activity, FrameLayout parent, List<VirtualButton> buttons, String label, int button, int width, int height, int gravity, int horizontalMargin, int verticalMargin, int xOffset) {
-        TextView view = makeButton(activity, label);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, gravity);
-        if ((gravity & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = horizontalMargin;
-        else if ((gravity & Gravity.LEFT) == Gravity.LEFT) lp.leftMargin = horizontalMargin;
-        if ((gravity & Gravity.TOP) == Gravity.TOP) lp.topMargin = verticalMargin;
-        else lp.bottomMargin = verticalMargin;
-        view.setTranslationX(xOffset);
+    private static void placeByCenter(FrameLayout parent, View view, int width, int height, float centerX, float centerY) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);
+        lp.leftMargin = Math.round(centerX - width / 2f);
+        lp.topMargin = Math.round(centerY - height / 2f);
         parent.addView(view, lp);
-        buttons.add(new VirtualButton(view, button));
     }
 
     private static TextView makeSystemButton(Activity activity, String label, Runnable action) {
