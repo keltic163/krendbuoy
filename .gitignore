@@ -1,24 +1,38 @@
-/*build*/*
-.vs/*
-.idea
+# Android Studio / Gradle local files
+.gradle/
+.idea/
+local.properties
+*.iml
+.DS_Store
+
+# Android / Gradle build outputs
+build/
+**/build/
+android-app/.cxx/
+**/.cxx/
+.externalNativeBuild/
+
+# Native build artifacts
+# We generally want to ignore built objects and binaries.
+# libvbam_libretro.so is built by scripts and copied to jniLibs.
 *.o
+*.a
 *.so
 *.dll
-!third_party/ps12exe/src/bin/**/*.dll
+*.dylib
 *.exe
+
+# Generated JNI libs for Android
+# These are copied from the build/ directory by Gradle tasks.
+android-app/src/main/jniLibs/
+
+# Editor / tooling
 .vscode/
 .claude/
-
-# clangd files
+.vs/
 compile_commands.json
 .cache/
 
-# vim swap files
+# Vim swap files
 *.sw?
 *.un~
-
-# mac finder crap
-*.DS_Store
-
-# online updates header
-src/wx/winsparkle-path.h
