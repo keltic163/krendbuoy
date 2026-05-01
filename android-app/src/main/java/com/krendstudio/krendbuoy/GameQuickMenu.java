@@ -15,8 +15,6 @@ final class GameQuickMenu {
         void releaseAllButtons();
         void restartGame();
         void leaveGame();
-        void showDisplaySettingsDialog();
-        void showAudioPresetDialog();
     }
 
     private GameQuickMenu() {
@@ -26,12 +24,12 @@ final class GameQuickMenu {
         host.pauseEmulationForMenu();
         host.releaseAllButtons();
 
+        // Removed "Display Settings" and "Audio Preset" as they are in global settings.
+        // Moved "Return to Main Menu" to the last option.
         String[] items = {
                 "Resume",
                 "Restart Game",
-                "Return to Main Menu",
-                "Display Settings",
-                "Audio Preset"
+                "Return to Main Menu"
         };
 
         new AlertDialog.Builder(activity)
@@ -44,10 +42,6 @@ final class GameQuickMenu {
                         host.restartGame();
                     } else if (which == 2) {
                         host.leaveGame();
-                    } else if (which == 3) {
-                        host.showDisplaySettingsDialog();
-                    } else if (which == 4) {
-                        host.showAudioPresetDialog();
                     }
                 })
                 .setOnCancelListener(dialog -> host.resumeEmulationFromMenu())

@@ -3,6 +3,12 @@ package com.krendstudio.krendbuoy;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -32,8 +38,13 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private String romBaseName = "selected";
     private int displayMode = AppSettingsManager.DISPLAY_FIT;
     private boolean debugTextVisible = false;
+    private boolean colorCorrectionEnabled = true;
+    private int bgDimmingLevel = 0;
+    private boolean screenBorderEnabled = false;
     private int startupLoadStateSlot = 0;
     private SaveStateManager saveStateManager;
+    private FrameLayout dimOverlay;
+    private View screenBorder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +55,9 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         audioBacklogSamples = settingsManager.getAudioPreset();
         displayMode = settingsManager.getDisplayMode();
         debugTextVisible = settingsManager.isDebugTextVisible();
+        colorCorrectionEnabled = settingsManager.isColorCorrectionEnabled();
+        bgDimmingLevel = settingsManager.getBgDimmingLevel();
+        screenBorderEnabled = settingsManager.isScreenBorderEnabled();
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > SaveStateManager.SLOT_COUNT) startupLoadStateSlot = 0;
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
@@ -63,6 +77,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         int screenHeight = Math.round(screenWidth * 2f / 3f);
         screenHeight = Math.max(dp(220), Math.min(screenHeight, dp(360)));
 
+        info = new TextView(this);
+        info.setText("00:00:00 / 0 FPS");
+        info.setTextSize(11f);
+        info.setTextColor(Color.GRAY);
+        info.setGravity(Gravity.LEFT);
+        info.setPadding(dp(8), 0, 0, dp(4));
+        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
+        content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
         FrameLayout screenBox = new FrameLayout(this);
         screenBox.setBackgroundColor(Color.BLACK);
         content.addView(screenBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, screenHeight));
@@ -73,14 +96,20 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         screenBox.addView(screen, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         frameLoopManager = new FrameLoopManager(this, screen);
 
-        info = new TextView(this);
-        info.setText("Preparing ROM...");
-        info.setTextSize(12f);
-        info.setTextColor(Color.LTGRAY);
-        info.setGravity(Gravity.CENTER);
-        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
-        content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        screenBorder = new View(this);
+        screenBorder.setBackground(new BorderDrawable(dp(4), Color.GRAY));
+        screenBorder.setVisibility(screenBorderEnabled ? View.VISIBLE : View.GONE);
+        screenBox.addView(screenBorder, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        dimOverlay = new FrameLayout(this);
+        dimOverlay.setBackgroundColor(Color.TRANSPARENT);
+        // dimOverlay will be added later to control Z-order
+        
         applyDisplayMode();
+
+        // Important: dimOverlay should be ABOVE content but BELOW GameControllerOverlay
+        root.addView(dimOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        updateDimOverlay();
 
         GameControllerOverlay.attach(this, root, this);
         setContentView(root);
@@ -331,24 +360,92 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public void showDisplaySettingsDialog() {
         pauseEmulationForMenu();
-        String[] labels = {"Fit Screen", "Original Ratio", "Stretch", debugTextVisible ? "Hide Debug Text" : "Show Debug Text"};
+        String[] sections = {"Screen Scaling", "Color Correction", "Background Dimming", "Screen Border", "Debug Text"};
         new AlertDialog.Builder(this)
                 .setTitle("Display Settings")
-                .setItems(labels, (dialog, which) -> {
-                    if (which <= 2) {
-                        displayMode = which;
-                        settingsManager.setDisplayMode(displayMode);
-                        applyDisplayMode();
-                    } else {
-                        debugTextVisible = !debugTextVisible;
-                        settingsManager.setDebugTextVisible(debugTextVisible);
-                        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
-                    }
-                    resumeEmulationFromMenu();
+                .setItems(sections, (dialog, which) -> {
+                    if (which == 0) showScalingDialog();
+                    else if (which == 1) toggleColorCorrection();
+                    else if (which == 2) showDimmingDialog();
+                    else if (which == 3) toggleScreenBorder();
+                    else if (which == 4) toggleDebugText();
                 })
-                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setNegativeButton("Back", (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
+    }
+
+    private void showScalingDialog() {
+        String[] labels = {"Fit Screen", "Original Ratio", "Stretch", "Pixel Perfect (2x)"};
+        new AlertDialog.Builder(this)
+                .setTitle("Screen Scaling")
+                .setSingleChoiceItems(labels, displayMode, (dialog, which) -> {
+                    displayMode = which;
+                    settingsManager.setDisplayMode(displayMode);
+                    applyDisplayMode();
+                    dialog.dismiss();
+                    resumeEmulationFromMenu();
+                })
+                .show();
+    }
+
+    private void toggleColorCorrection() {
+        colorCorrectionEnabled = !colorCorrectionEnabled;
+        settingsManager.setColorCorrectionEnabled(colorCorrectionEnabled);
+        showToast("Color Correction: " + (colorCorrectionEnabled ? "On" : "Off"));
+        resumeEmulationFromMenu();
+    }
+
+    private void showDimmingDialog() {
+        String[] labels = {"Brightest (100%)", "Bright (80%)", "Medium (60%)", "Dim (40%)"};
+        new AlertDialog.Builder(this)
+                .setTitle("Screen Brightness")
+                .setSingleChoiceItems(labels, bgDimmingLevel, (dialog, which) -> {
+                    bgDimmingLevel = which;
+                    settingsManager.setBgDimmingLevel(bgDimmingLevel);
+                    updateDimOverlay();
+                    dialog.dismiss();
+                    resumeEmulationFromMenu();
+                })
+                .show();
+    }
+
+    private void updateDimOverlay() {
+        if (dimOverlay == null) return;
+        dimOverlay.setVisibility(bgDimmingLevel > 0 ? View.VISIBLE : View.GONE);
+        dimOverlay.removeAllViews();
+        if (bgDimmingLevel > 0) {
+            View dimView = new View(this);
+            dimView.setBackgroundColor(Color.BLACK);
+            dimView.setAlpha(getDimAlpha(bgDimmingLevel));
+            dimOverlay.addView(dimView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            
+            // Allow clicks to pass through dimOverlay to the content/controller below
+            // Note: dimOverlay is a FrameLayout, setting clickable(false) on dimView
+            dimView.setClickable(false);
+            dimOverlay.setClickable(false);
+        }
+    }
+
+    private void toggleScreenBorder() {
+        screenBorderEnabled = !screenBorderEnabled;
+        settingsManager.setScreenBorderEnabled(screenBorderEnabled);
+        if (screenBorder != null) screenBorder.setVisibility(screenBorderEnabled ? View.VISIBLE : View.GONE);
+        resumeEmulationFromMenu();
+    }
+
+    private void toggleDebugText() {
+        debugTextVisible = !debugTextVisible;
+        settingsManager.setDebugTextVisible(debugTextVisible);
+        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
+        resumeEmulationFromMenu();
+    }
+
+    private float getDimAlpha(int level) {
+        if (level == 1) return 0.2f;
+        if (level == 2) return 0.4f;
+        if (level == 3) return 0.6f;
+        return 0.0f;
     }
 
     @Override
@@ -377,20 +474,32 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         GameSettingsDialogs.showControllerSettings(this, this);
     }
 
-    @Override
     public void showGlobalSettingsDialog() {
         GameSettingsDialogs.showGlobalSettings(this, this);
     }
 
-    @Override
     public void showUnavailableFeature(String title, String message) {
         pauseEmulationForMenu();
         showQuickNotice(title, message);
     }
 
     private void applyDisplayMode() {
-        screen.setAdjustViewBounds(displayMode != AppSettingsManager.DISPLAY_STRETCH);
-        screen.setScaleType(displayMode == AppSettingsManager.DISPLAY_STRETCH ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
+        if (displayMode == AppSettingsManager.DISPLAY_PIXEL_PERFECT) {
+            screen.setAdjustViewBounds(true);
+            screen.setScaleType(ImageView.ScaleType.CENTER);
+            // GBA is 240x160. 2x is 480x320.
+            ViewGroup.LayoutParams lp = screen.getLayoutParams();
+            lp.width = dp(480);
+            lp.height = dp(320);
+            screen.setLayoutParams(lp);
+        } else {
+            screen.setAdjustViewBounds(displayMode != AppSettingsManager.DISPLAY_STRETCH);
+            screen.setScaleType(displayMode == AppSettingsManager.DISPLAY_STRETCH ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
+            ViewGroup.LayoutParams lp = screen.getLayoutParams();
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            screen.setLayoutParams(lp);
+        }
         updateInfo("Display mode: " + AppSettingsManager.displayModeLabel(displayMode));
     }
 
@@ -431,5 +540,28 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static class BorderDrawable extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int strokeWidth;
+
+        BorderDrawable(int strokeWidth, int color) {
+            this.strokeWidth = strokeWidth;
+            this.paint.setColor(color);
+            this.paint.setStyle(Paint.Style.STROKE);
+            this.paint.setStrokeWidth(strokeWidth);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            Rect bounds = getBounds();
+            float half = strokeWidth / 2f;
+            canvas.drawRect(bounds.left + half, bounds.top + half, bounds.right - half, bounds.bottom - half, paint);
+        }
+
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(ColorFilter colorFilter) { paint.setColorFilter(colorFilter); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 }

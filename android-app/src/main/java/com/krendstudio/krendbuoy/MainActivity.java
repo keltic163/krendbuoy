@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -32,11 +33,9 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
-    private static final int AUDIO_DYNAMIC_VALUE = -1;
     private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
     private static final String PREFS = "krendbuoy_prefs";
     private static final String KEY_FOLDER_URI = "folder_uri";
-    private static final String KEY_AUDIO_PRESET = "audio_preset";
     private static final String KEY_SORT_MODE = "sort_mode";
     private static final String KEY_FAVORITES = "favorite_roms";
     private static final String KEY_LAST_PLAYED_PREFIX = "last_played_";
@@ -49,6 +48,7 @@ public class MainActivity extends Activity {
     private static final int SORT_RECENTLY_ADDED = 4;
 
     private SharedPreferences prefs;
+    private AppSettingsManager settingsManager;
     private LinearLayout root;
     private LinearLayout topBar;
     private FrameLayout pageContainer;
@@ -57,10 +57,9 @@ public class MainActivity extends Activity {
     private LinearLayout romList;
     private TextView folderPathView;
     private TextView emptyView;
-    private Button gamesTab;
-    private Button settingsTab;
+    private View gamesTab;
+    private View settingsTab;
     private Uri selectedSaveFolderUri;
-    private int selectedAudioBacklogSamples = AUDIO_DYNAMIC_VALUE;
     private int sortMode = SORT_LAST_PLAYED;
     private boolean coreLoaded;
     private String coreStatus;
@@ -80,7 +79,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        selectedAudioBacklogSamples = prefs.getInt(KEY_AUDIO_PRESET, AUDIO_DYNAMIC_VALUE);
+        settingsManager = new AppSettingsManager(this);
         sortMode = prefs.getInt(KEY_SORT_MODE, SORT_LAST_PLAYED);
         String savedFolder = prefs.getString(KEY_FOLDER_URI, null);
         if (savedFolder != null && !savedFolder.isEmpty()) selectedSaveFolderUri = Uri.parse(savedFolder);
@@ -104,7 +103,7 @@ public class MainActivity extends Activity {
     private void buildRootUi() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(18, 24, 34));
+        root.setBackgroundColor(Color.rgb(20, 24, 28)); // Match Game Panel background
         root.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         buildTopBar();
         root.addView(topBar);
@@ -120,22 +119,29 @@ public class MainActivity extends Activity {
         topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setPadding(dp(16), dp(12), dp(16), dp(10));
-        topBar.setBackgroundColor(Color.rgb(22, 31, 46));
+        topBar.setPadding(dp(16), dp(16), dp(16), dp(12));
+        topBar.setBackgroundColor(Color.rgb(20, 24, 28));
+        
         TextView title = new TextView(this);
         title.setText("KrendBuoy");
         title.setTextColor(Color.WHITE);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextSize(22f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextSize(20f);
         topBar.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button sort = new Button(this);
-        sort.setText("Sort");
-        sort.setOnClickListener(v -> showSortDialog());
-        topBar.addView(sort, new LinearLayout.LayoutParams(dp(88), ViewGroup.LayoutParams.WRAP_CONTENT));
-        Button refresh = new Button(this);
-        refresh.setText("Refresh");
-        refresh.setOnClickListener(v -> refreshRomList());
-        topBar.addView(refresh, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
+        
+        addTopBarIcon("\u21BB", this::refreshRomList); // Refresh icon
+        addTopBarIcon("\u21C5", this::showSortDialog); // Sort/Arrows icon
+    }
+
+    private void addTopBarIcon(String icon, Runnable action) {
+        TextView view = new TextView(this);
+        view.setText(icon);
+        view.setTextSize(22f);
+        view.setTextColor(Color.WHITE);
+        view.setGravity(Gravity.CENTER);
+        view.setPadding(dp(8), 0, dp(8), 0);
+        view.setOnClickListener(v -> action.run());
+        topBar.addView(view, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     private void buildGamesPage() {
@@ -188,6 +194,34 @@ public class MainActivity extends Activity {
         settingsPage.setOrientation(LinearLayout.VERTICAL);
         settingsPage.setPadding(dp(16), dp(16), dp(16), dp(16));
         scroll.addView(settingsPage, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // Display Settings
+        settingsPage.addView(sectionTitle("Display"));
+        settingsPage.addView(makeSettingButton("Screen Scaling", () -> {
+            String[] labels = {"Fit Screen", "Original Ratio", "Stretch", "Pixel Perfect (2x)"};
+            new AlertDialog.Builder(this)
+                    .setTitle("Screen Scaling")
+                    .setSingleChoiceItems(labels, settingsManager.getDisplayMode(), (dialog, which) -> {
+                        settingsManager.setDisplayMode(which);
+                        dialog.dismiss();
+                    }).show();
+        }), blockParams(0, 8, 0, 12));
+
+        settingsPage.addView(makeSettingButton("Screen Brightness", () -> {
+            String[] labels = {"Brightest (100%)", "Bright (80%)", "Medium (60%)", "Dim (40%)"};
+            new AlertDialog.Builder(this)
+                    .setTitle("Screen Brightness")
+                    .setSingleChoiceItems(labels, settingsManager.getBgDimmingLevel(), (dialog, which) -> {
+                        settingsManager.setBgDimmingLevel(which);
+                        dialog.dismiss();
+                    }).show();
+        }), blockParams(0, 0, 0, 12));
+
+        settingsPage.addView(makeSettingToggle("Color Correction", settingsManager.isColorCorrectionEnabled(), settingsManager::setColorCorrectionEnabled), blockParams(0, 0, 0, 12));
+        settingsPage.addView(makeSettingToggle("Screen Border", settingsManager.isScreenBorderEnabled(), settingsManager::setScreenBorderEnabled), blockParams(0, 0, 0, 12));
+        settingsPage.addView(makeSettingToggle("Show Debug Info (FPS)", settingsManager.isDebugTextVisible(), settingsManager::setDebugTextVisible), blockParams(0, 0, 0, 24));
+
+        // Audio Settings
         settingsPage.addView(sectionTitle("Audio Preset"));
         RadioGroup audioGroup = new RadioGroup(this);
         audioGroup.setOrientation(RadioGroup.VERTICAL);
@@ -197,12 +231,15 @@ public class MainActivity extends Activity {
         addAudioOption(audioGroup, 1024, "1024 - ultra low latency, may crackle");
         addAudioOption(audioGroup, 2048, "2048 - low latency");
         addAudioOption(audioGroup, 4096, "4096 - balanced");
-        audioGroup.check(selectedAudioBacklogSamples == AUDIO_DYNAMIC_VALUE ? AUDIO_DYNAMIC_VIEW_ID : selectedAudioBacklogSamples);
+        
+        int currentAudio = settingsManager.getAudioPreset();
+        audioGroup.check(currentAudio == AppSettingsManager.AUDIO_DYNAMIC ? AUDIO_DYNAMIC_VIEW_ID : currentAudio);
         audioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            selectedAudioBacklogSamples = checkedId == AUDIO_DYNAMIC_VIEW_ID ? AUDIO_DYNAMIC_VALUE : checkedId;
-            prefs.edit().putInt(KEY_AUDIO_PRESET, selectedAudioBacklogSamples).apply();
+            int val = checkedId == AUDIO_DYNAMIC_VIEW_ID ? AppSettingsManager.AUDIO_DYNAMIC : checkedId;
+            settingsManager.setAudioPreset(val);
         });
         settingsPage.addView(audioGroup, blockParams(0, 8, 0, 24));
+
         settingsPage.addView(sectionTitle("Core Status"));
         settingsPage.addView(bodyCard(coreStatus), blockParams(0, 8, 0, 24));
         settingsPage.addView(sectionTitle("About"));
@@ -212,20 +249,21 @@ public class MainActivity extends Activity {
         settingsPage.setTag(scroll);
     }
 
-    private void buildBottomTabs() {
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(dp(12), dp(8), dp(12), dp(8));
-        tabs.setBackgroundColor(Color.rgb(14, 20, 30));
-        gamesTab = new Button(this);
-        gamesTab.setText("Games");
-        gamesTab.setOnClickListener(v -> showGamesPage());
-        tabs.addView(gamesTab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        settingsTab = new Button(this);
-        settingsTab.setText("Settings");
-        settingsTab.setOnClickListener(v -> showSettingsPage());
-        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(tabs);
+    private View makeSettingButton(String title, Runnable action) {
+        Button btn = new Button(this);
+        btn.setText(title);
+        btn.setAllCaps(false);
+        btn.setOnClickListener(v -> action.run());
+        return btn;
+    }
+
+    private View makeSettingToggle(String title, boolean initial, java.util.function.Consumer<Boolean> onToggle) {
+        CheckBox cb = new CheckBox(this);
+        cb.setText(title);
+        cb.setChecked(initial);
+        cb.setTextColor(Color.WHITE);
+        cb.setOnCheckedChangeListener((v, checked) -> onToggle.accept(checked));
+        return cb;
     }
 
     private void addAudioOption(RadioGroup group, int id, String label) {
@@ -237,17 +275,71 @@ public class MainActivity extends Activity {
         group.addView(button);
     }
 
+    private void buildBottomTabs() {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(0, dp(8), 0, dp(8));
+        tabs.setBackgroundColor(Color.rgb(20, 24, 28));
+        
+        int btnW = getResources().getDisplayMetrics().widthPixels / 2;
+        
+        gamesTab = addNavButton(tabs, "GAMES", "\uD83C\uDFAE", btnW, this::showGamesPage);
+        settingsTab = addNavButton(tabs, "SETTINGS", "\u2699\uFE0F", btnW, this::showSettingsPage);
+        
+        root.addView(tabs);
+    }
+
+    private View addNavButton(LinearLayout parent, String text, String icon, int width, Runnable action) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        
+        TextView iconView = new TextView(this);
+        iconView.setText(icon);
+        iconView.setTextSize(20f);
+        iconView.setGravity(Gravity.CENTER);
+        layout.addView(iconView);
+        
+        TextView textView = new TextView(this);
+        textView.setText(text);
+        textView.setTextSize(10f);
+        textView.setGravity(Gravity.CENTER);
+        layout.addView(textView);
+        
+        parent.addView(layout, new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.setOnClickListener(v -> action.run());
+        
+        // Tag the layout to easily find it for coloring
+        layout.setTag(textView);
+        return (View) layout;
+    }
+
     private void showGamesPage() {
         if (pageContainer == null) return;
-        for (int i = 0; i < pageContainer.getChildCount(); i++) pageContainer.getChildAt(i).setVisibility(i == 0 ? View.VISIBLE : View.GONE);
-        if (gamesTab != null) gamesTab.setEnabled(false);
-        if (settingsTab != null) settingsTab.setEnabled(true);
+        pageContainer.getChildAt(0).setVisibility(View.VISIBLE);
+        pageContainer.getChildAt(1).setVisibility(View.GONE);
+        updateNavColor(0);
     }
 
     private void showSettingsPage() {
-        for (int i = 0; i < pageContainer.getChildCount(); i++) pageContainer.getChildAt(i).setVisibility(i == 1 ? View.VISIBLE : View.GONE);
-        gamesTab.setEnabled(true);
-        settingsTab.setEnabled(false);
+        pageContainer.getChildAt(0).setVisibility(View.GONE);
+        pageContainer.getChildAt(1).setVisibility(View.VISIBLE);
+        updateNavColor(1);
+    }
+
+    private void updateNavColor(int index) {
+        int blue = Color.rgb(61, 155, 235);
+        int gray = Color.GRAY;
+        
+        setNavGroupColor((ViewGroup) gamesTab, index == 0 ? blue : gray);
+        setNavGroupColor((ViewGroup) settingsTab, index == 1 ? blue : gray);
+    }
+
+    private void setNavGroupColor(ViewGroup group, int color) {
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View v = group.getChildAt(i);
+            if (v instanceof TextView) ((TextView) v).setTextColor(color);
+        }
     }
 
     private void showSortDialog() {
@@ -493,7 +585,6 @@ public class MainActivity extends Activity {
         markLastPlayed(baseName);
         Intent intent = new Intent(this, GameActivityV2.class);
         intent.setData(romUri);
-        intent.putExtra("audio_backlog_samples", selectedAudioBacklogSamples);
         intent.putExtra("save_folder_uri", selectedSaveFolderUri.toString());
         intent.putExtra("load_state_slot", loadStateSlot);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

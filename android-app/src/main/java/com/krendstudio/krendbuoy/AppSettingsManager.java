@@ -16,6 +16,7 @@ final class AppSettingsManager {
     static final int DISPLAY_FIT = 0;
     static final int DISPLAY_ORIGINAL_RATIO = 1;
     static final int DISPLAY_STRETCH = 2;
+    static final int DISPLAY_PIXEL_PERFECT = 3;
 
     static final int THEME_DEFAULT = 0;
     static final int LANGUAGE_SYSTEM = 0;
@@ -23,6 +24,9 @@ final class AppSettingsManager {
     private static final String KEY_AUDIO_PRESET = "audio_preset";
     private static final String KEY_DISPLAY_MODE = "display_mode";
     private static final String KEY_DEBUG_TEXT_VISIBLE = "debug_text_visible";
+    private static final String KEY_COLOR_CORRECTION = "color_correction";
+    private static final String KEY_BG_DIMMING = "bg_dimming";
+    private static final String KEY_SCREEN_BORDER = "screen_border";
     private static final String KEY_THEME = "interface_theme";
     private static final String KEY_LANGUAGE = "language_mode";
     private static final String KEY_CONTROLLER_LAYOUT = "controller_layout";
@@ -49,7 +53,31 @@ final class AppSettingsManager {
     }
 
     void setDisplayMode(int value) {
-        prefs.edit().putInt(KEY_DISPLAY_MODE, value == DISPLAY_ORIGINAL_RATIO || value == DISPLAY_STRETCH ? value : DISPLAY_FIT).apply();
+        prefs.edit().putInt(KEY_DISPLAY_MODE, value).apply();
+    }
+
+    boolean isColorCorrectionEnabled() {
+        return prefs.getBoolean(KEY_COLOR_CORRECTION, true);
+    }
+
+    void setColorCorrectionEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_COLOR_CORRECTION, enabled).apply();
+    }
+
+    int getBgDimmingLevel() {
+        return prefs.getInt(KEY_BG_DIMMING, 0); // 0: None, 1: Low, 2: Mid, 3: High
+    }
+
+    void setBgDimmingLevel(int level) {
+        prefs.edit().putInt(KEY_BG_DIMMING, level).apply();
+    }
+
+    boolean isScreenBorderEnabled() {
+        return prefs.getBoolean(KEY_SCREEN_BORDER, false);
+    }
+
+    void setScreenBorderEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SCREEN_BORDER, enabled).apply();
     }
 
     boolean isDebugTextVisible() {
@@ -115,6 +143,7 @@ final class AppSettingsManager {
     static String displayModeLabel(int value) {
         if (value == DISPLAY_ORIGINAL_RATIO) return "Original Ratio";
         if (value == DISPLAY_STRETCH) return "Stretch";
+        if (value == DISPLAY_PIXEL_PERFECT) return "Pixel Perfect (2x)";
         return "Fit Screen";
     }
 

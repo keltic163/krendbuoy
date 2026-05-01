@@ -60,6 +60,7 @@ HOST_TAG=""
 case "$(uname -s)" in
   Linux)  HOST_TAG="linux-x86_64" ;;
   Darwin) HOST_TAG="darwin-x86_64" ;;
+  MINGW*|MSYS*|CYGWIN*) HOST_TAG="windows-x86_64" ;;
   *)
     echo "error: unsupported host OS: $(uname -s)" >&2
     exit 1
@@ -117,8 +118,11 @@ printf '  Output: %s\n' "$OUT_DIR/vbam_libretro.so"
 
 COMMON_FLAGS="-DANDROID -D__LIBRETRO__ -DC_CORE"
 
-make -C "$LIBRETRO_DIR" clean >/dev/null 2>&1 || true
-make -C "$LIBRETRO_DIR" \
+# 使用環境變數傳入的 MAKE_BIN，若無則回退到預設的 make
+MAKE="${MAKE_BIN:-make}"
+
+$MAKE -C "$LIBRETRO_DIR" clean >/dev/null 2>&1 || true
+$MAKE -C "$LIBRETRO_DIR" \
   platform="$MAKE_PLATFORM" \
   CC="$CC_BIN" \
   CXX="$CXX_BIN" \

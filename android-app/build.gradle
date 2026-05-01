@@ -6,15 +6,6 @@ android {
     namespace 'com.krendstudio.krendbuoy'
     compileSdk 34
 
-    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
-        }
-    }
-
     defaultConfig {
         applicationId 'com.krendstudio.krendbuoy'
         minSdk 23
@@ -41,7 +32,6 @@ android {
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
         }
         release {
             minifyEnabled false
@@ -64,10 +54,6 @@ dependencies {
 // The Android CMake file only builds the small JNI bridge. The VBA-M libretro
 // core is still built by src/libretro/Makefile through scripts/build-android-libretro.sh.
 def krendbuoyNativeAbi = 'arm64-v8a'
-
-def singleQuoteForBash = { String value ->
-    return "'" + value.replace("'", "'\"'\"'") + "'"
-}
 
 def findBashExecutable = {
     def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
@@ -171,18 +157,23 @@ tasks.register('buildAndroidLibretroCore', Exec) {
             throw new GradleException("Android NDK directory does not exist: ${ndkDir}")
         }
 
-        def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
         def bashExecutable = findBashExecutable()
-
-        if (isWindows) {
-            def repoPath = singleQuoteForBash(rootProject.projectDir.absolutePath)
-            def ndkPath = singleQuoteForBash(ndkDir.absolutePath)
-            def shellCommand = "cd \"\$(cygpath -u ${repoPath})\" && ANDROID_NDK_HOME=\"\$(cygpath -u ${ndkPath})\" scripts/build-android-libretro.sh ${krendbuoyNativeAbi}"
-            commandLine bashExecutable, '-lc', shellCommand
-        } else {
-            environment 'ANDROID_NDK_HOME', ndkDir.absolutePath
-            commandLine bashExecutable, scriptFile.absolutePath, krendbuoyNativeAbi
+        def hostTag = findNdkHostTag(ndkDir)
+        // 使用 NDK 自帶的 make 工具，避免系統找不到指令
+        def makeExecutable = new File(ndkDir, "prebuilt/${hostTag}/bin/make.exe")
+        if (!makeExecutable.exists()) {
+            // 嘗試非 .exe (針對 Linux/Mac 主機)
+            makeExecutable = new File(ndkDir, "prebuilt/${hostTag}/bin/make")
         }
+
+        println "Using bash: ${bashExecutable}"
+        println "Using make: ${makeExecutable.absolutePath}"
+        println "NDK: ${ndkDir.absolutePath}"
+
+        environment 'ANDROID_NDK_HOME', ndkDir.absolutePath
+        // 將 MAKE 變數傳入環境，讓腳本優先使用
+        environment 'MAKE_BIN', makeExecutable.absolutePath
+        commandLine bashExecutable, scriptFile.absolutePath, krendbuoyNativeAbi
     }
 }
 
