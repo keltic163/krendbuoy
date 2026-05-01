@@ -1,5 +1,6 @@
 name: build-android-apk
 
+# Touch this file to trigger a full Android APK validation build.
 on:
   workflow_dispatch:
   push:
