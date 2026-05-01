@@ -59,3 +59,173 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
 }
+
+// Keep Android Studio and GitHub Actions on the same native build path.
+// The Android CMake file only builds the small JNI bridge. The VBA-M libretro
+// core is still built by src/libretro/Makefile through scripts/build-android-libretro.sh.
+def krendbuoyNativeAbi = 'arm64-v8a'
+
+def singleQuoteForBash = { String value ->
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+}
+
+def findBashExecutable = {
+    def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+    if (!isWindows) {
+        return 'bash'
+    }
+
+    def candidates = [
+        System.getenv('BASH'),
+        'C:/Program Files/Git/bin/bash.exe',
+        'C:/Program Files/Git/usr/bin/bash.exe',
+        'C:/msys64/usr/bin/bash.exe',
+        'C:/msys64/mingw64/bin/bash.exe',
+        'C:/msys64/clang64/bin/bash.exe'
+    ].findAll { it != null && it.trim().length() > 0 }
+
+    def match = candidates.find { file(it).exists() }
+    return match ?: 'bash'
+}
+
+def resolveAndroidNdkDir = {
+    def envNdk = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+    if (envNdk != null && envNdk.trim().length() > 0) {
+        return file(envNdk)
+    }
+
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        def localProperties = new Properties()
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+
+        def ndkDirProperty = localProperties.getProperty('ndk.dir')
+        if (ndkDirProperty != null && ndkDirProperty.trim().length() > 0) {
+            return file(ndkDirProperty)
+        }
+
+        def sdkDirProperty = localProperties.getProperty('sdk.dir')
+        if (sdkDirProperty != null && sdkDirProperty.trim().length() > 0) {
+            def sdkDir = file(sdkDirProperty)
+            def workflowNdk = new File(sdkDir, 'ndk/26.3.11579264')
+            if (workflowNdk.exists()) {
+                return workflowNdk
+            }
+
+            def ndkRoot = new File(sdkDir, 'ndk')
+            if (ndkRoot.exists()) {
+                def installedNdks = ndkRoot.listFiles()?.findAll { it.isDirectory() }?.sort { a, b -> b.name <=> a.name }
+                if (installedNdks != null && !installedNdks.isEmpty()) {
+                    return installedNdks.first()
+                }
+            }
+        }
+    }
+
+    throw new GradleException('Android NDK not found. Install NDK 26.3.11579264 in Android Studio, or set ANDROID_NDK_HOME / ANDROID_NDK_ROOT / ndk.dir.')
+}
+
+def findNdkHostTag = { File ndkDir ->
+    def prebuiltDir = new File(ndkDir, 'toolchains/llvm/prebuilt')
+    def osName = System.getProperty('os.name').toLowerCase()
+    def candidates
+
+    if (osName.contains('windows')) {
+        candidates = ['windows-x86_64']
+    } else if (osName.contains('mac') || osName.contains('darwin')) {
+        candidates = ['darwin-x86_64', 'darwin-arm64']
+    } else {
+        candidates = ['linux-x86_64']
+    }
+
+    def hostTag = candidates.find { new File(prebuiltDir, it).exists() }
+    if (hostTag != null) {
+        return hostTag
+    }
+
+    def installedHostTags = prebuiltDir.listFiles()?.findAll { it.isDirectory() }
+    if (installedHostTags != null && !installedHostTags.isEmpty()) {
+        return installedHostTags.first().name
+    }
+
+    throw new GradleException("Android NDK LLVM prebuilt toolchain not found under ${prebuiltDir}")
+}
+
+tasks.register('buildAndroidLibretroCore', Exec) {
+    group = 'build'
+    description = 'Builds the VBA-M libretro core used by the Android APK.'
+
+    def scriptFile = rootProject.file('scripts/build-android-libretro.sh')
+    def outputFile = rootProject.file("build/android/${krendbuoyNativeAbi}/vbam_libretro.so")
+
+    inputs.file(scriptFile)
+    inputs.dir(rootProject.file('src/libretro'))
+    inputs.dir(rootProject.file('src/core'))
+    outputs.file(outputFile)
+
+    workingDir rootProject.projectDir
+
+    doFirst {
+        def ndkDir = resolveAndroidNdkDir()
+        if (!ndkDir.exists()) {
+            throw new GradleException("Android NDK directory does not exist: ${ndkDir}")
+        }
+
+        def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+        def bashExecutable = findBashExecutable()
+
+        if (isWindows) {
+            def repoPath = singleQuoteForBash(rootProject.projectDir.absolutePath)
+            def ndkPath = singleQuoteForBash(ndkDir.absolutePath)
+            def shellCommand = "cd \"\$(cygpath -u ${repoPath})\" && ANDROID_NDK_HOME=\"\$(cygpath -u ${ndkPath})\" scripts/build-android-libretro.sh ${krendbuoyNativeAbi}"
+            commandLine bashExecutable, '-lc', shellCommand
+        } else {
+            environment 'ANDROID_NDK_HOME', ndkDir.absolutePath
+            commandLine bashExecutable, scriptFile.absolutePath, krendbuoyNativeAbi
+        }
+    }
+}
+
+tasks.register('prepareAndroidJniLibs') {
+    group = 'build'
+    description = 'Copies generated native libraries into android-app/src/main/jniLibs.'
+    dependsOn tasks.named('buildAndroidLibretroCore')
+
+    def jniLibDir = file("src/main/jniLibs/${krendbuoyNativeAbi}")
+    def libretroOutput = rootProject.file("build/android/${krendbuoyNativeAbi}/vbam_libretro.so")
+    def copiedLibretro = new File(jniLibDir, 'libvbam_libretro.so')
+    def copiedLibcxx = new File(jniLibDir, 'libc++_shared.so')
+
+    inputs.file(libretroOutput)
+    outputs.file(copiedLibretro)
+    outputs.file(copiedLibcxx)
+
+    doLast {
+        def ndkDir = resolveAndroidNdkDir()
+        def hostTag = findNdkHostTag(ndkDir)
+        def libcxxPath = new File(ndkDir, "toolchains/llvm/prebuilt/${hostTag}/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+
+        if (!libretroOutput.exists()) {
+            throw new GradleException("Missing generated libretro core: ${libretroOutput}")
+        }
+        if (!libcxxPath.exists()) {
+            throw new GradleException("Missing NDK libc++_shared.so: ${libcxxPath}")
+        }
+
+        copy {
+            from libretroOutput
+            into jniLibDir
+            rename { 'libvbam_libretro.so' }
+        }
+        copy {
+            from libcxxPath
+            into jniLibDir
+        }
+
+        println "Prepared Android JNI libs in ${jniLibDir}"
+    }
+}
+
+tasks.named('preBuild') {
+    dependsOn tasks.named('prepareAndroidJniLibs')
+}
