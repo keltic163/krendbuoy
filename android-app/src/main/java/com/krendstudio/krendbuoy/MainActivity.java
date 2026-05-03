@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SharedSettingsBuilder.Host {
     private static final int REQUEST_OPEN_SAVE_FOLDER = 1002;
     private static final int AUDIO_DYNAMIC_VIEW_ID = 100000;
     private static final String PREFS = "krendbuoy_prefs";
@@ -188,65 +188,23 @@ public class MainActivity extends Activity {
         pageContainer.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
+    @Override
+    public AppSettingsManager getSettingsManager() {
+        return settingsManager;
+    }
+
+    @Override
+    public void onSettingChanged() {
+        // Many settings need a refresh or activity recreate
+        // For simplicity, just refresh UI if on settings page
+        refreshRomList(); 
+    }
+
     private void buildSettingsPage() {
-        ScrollView scroll = new ScrollView(this);
-        settingsPage = new LinearLayout(this);
-        settingsPage.setOrientation(LinearLayout.VERTICAL);
-        settingsPage.setPadding(dp(16), dp(16), dp(16), dp(16));
-        scroll.addView(settingsPage, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        // Display Settings
-        settingsPage.addView(sectionTitle("Display"));
-        settingsPage.addView(makeSettingButton("Screen Scaling", () -> {
-            String[] labels = {"Fit Screen", "Original Ratio", "Stretch", "Pixel Perfect (2x)"};
-            new AlertDialog.Builder(this)
-                    .setTitle("Screen Scaling")
-                    .setSingleChoiceItems(labels, settingsManager.getDisplayMode(), (dialog, which) -> {
-                        settingsManager.setDisplayMode(which);
-                        dialog.dismiss();
-                    }).show();
-        }), blockParams(0, 8, 0, 12));
-
-        settingsPage.addView(makeSettingButton("Screen Brightness", () -> {
-            String[] labels = {"Brightest (100%)", "Bright (80%)", "Medium (60%)", "Dim (40%)"};
-            new AlertDialog.Builder(this)
-                    .setTitle("Screen Brightness")
-                    .setSingleChoiceItems(labels, settingsManager.getBgDimmingLevel(), (dialog, which) -> {
-                        settingsManager.setBgDimmingLevel(which);
-                        dialog.dismiss();
-                    }).show();
-        }), blockParams(0, 0, 0, 12));
-
-        settingsPage.addView(makeSettingToggle("Color Correction", settingsManager.isColorCorrectionEnabled(), settingsManager::setColorCorrectionEnabled), blockParams(0, 0, 0, 12));
-        settingsPage.addView(makeSettingToggle("Screen Border", settingsManager.isScreenBorderEnabled(), settingsManager::setScreenBorderEnabled), blockParams(0, 0, 0, 12));
-        settingsPage.addView(makeSettingToggle("Show Debug Info (FPS)", settingsManager.isDebugTextVisible(), settingsManager::setDebugTextVisible), blockParams(0, 0, 0, 24));
-
-        // Audio Settings
-        settingsPage.addView(sectionTitle("Audio Preset"));
-        RadioGroup audioGroup = new RadioGroup(this);
-        audioGroup.setOrientation(RadioGroup.VERTICAL);
-        audioGroup.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(10)));
-        audioGroup.setPadding(dp(12), dp(8), dp(12), dp(8));
-        addAudioOption(audioGroup, AUDIO_DYNAMIC_VIEW_ID, "Dynamic - recommended");
-        addAudioOption(audioGroup, 1024, "1024 - ultra low latency, may crackle");
-        addAudioOption(audioGroup, 2048, "2048 - low latency");
-        addAudioOption(audioGroup, 4096, "4096 - balanced");
-        
-        int currentAudio = settingsManager.getAudioPreset();
-        audioGroup.check(currentAudio == AppSettingsManager.AUDIO_DYNAMIC ? AUDIO_DYNAMIC_VIEW_ID : currentAudio);
-        audioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            int val = checkedId == AUDIO_DYNAMIC_VIEW_ID ? AppSettingsManager.AUDIO_DYNAMIC : checkedId;
-            settingsManager.setAudioPreset(val);
-        });
-        settingsPage.addView(audioGroup, blockParams(0, 8, 0, 24));
-
-        settingsPage.addView(sectionTitle("Core Status"));
-        settingsPage.addView(bodyCard(coreStatus), blockParams(0, 8, 0, 24));
-        settingsPage.addView(sectionTitle("About"));
-        settingsPage.addView(bodyCard("KrendBuoy Android test build\nPortable .sav and multi-slot save states are stored in the selected folder."), blockParams(0, 8, 0, 24));
-        scroll.setVisibility(View.GONE);
-        pageContainer.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        settingsPage.setTag(scroll);
+        View settingsView = SharedSettingsBuilder.buildSettingsView(this, this);
+        pageContainer.addView(settingsView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        settingsPage = (LinearLayout) ((ViewGroup)settingsView).getChildAt(0); // Optional: keep reference
+        settingsPage.setTag(settingsView);
     }
 
     private View makeSettingButton(String title, Runnable action) {
@@ -485,16 +443,21 @@ public class MainActivity extends Activity {
     }
 
     private void showLoadStateSlotDialog(RomEntry entry) {
-        String[] labels = new String[SaveStateManager.SLOT_COUNT];
-        for (int slot = 1; slot <= SaveStateManager.SLOT_COUNT; slot++) labels[slot - 1] = stateSlotLabel(entry.baseName, slot);
-        new AlertDialog.Builder(this).setTitle("Load State Slot").setItems(labels, (dialog, which) -> {
-            int slot = which + 1;
-            if (!stateSlotExists(entry.baseName, slot)) {
-                showNotice("Load State", "No save state found in Slot " + slot + ".");
-                return;
+        RomSessionManager romSessionManager = new RomSessionManager(this);
+        SaveStateManager ssm = new SaveStateManager(this, selectedSaveFolderUri, romSessionManager.ensureDirectory("states"), entry.baseName);
+        StateDialogHelper.show(this, "Load State - " + entry.name, ssm, null, new StateDialogHelper.Callback() {
+            @Override
+            public void onSlotSelected(int slot) {
+                if (ssm.getModifiedTime(slot) > 0) {
+                     startGame(entry.uri, entry.baseName, slot);
+                } else {
+                     showNotice("Load State", "No save state found in Slot " + slot + ".");
+                }
             }
-            startGame(entry.uri, entry.baseName, slot);
-        }).setNegativeButton("Cancel", null).show();
+
+            @Override
+            public void onDismiss() {}
+        });
     }
 
     private String stateSlotLabel(String baseName, int slot) {

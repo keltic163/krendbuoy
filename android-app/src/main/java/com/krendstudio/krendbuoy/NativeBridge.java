@@ -57,4 +57,12 @@ public final class NativeBridge {
     public static native String getLastError();
 
     public static native void unloadRom();
+
+    public static native void cheatReset();
+
+    public static native void cheatSet(int index, boolean enabled, String code);
+
+    public static native byte[] readMemory(int address, int size);
+
+    public static native boolean writeMemory(int address, byte[] data);
 }

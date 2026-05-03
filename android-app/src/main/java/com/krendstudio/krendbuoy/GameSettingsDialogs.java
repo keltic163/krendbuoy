@@ -15,6 +15,7 @@ final class GameSettingsDialogs {
         void showDisplaySettingsDialog();
         void showAudioPresetDialog();
         void showControllerSettingsDialog();
+        AppSettingsManager getSettingsManager();
     }
 
     private GameSettingsDialogs() {
@@ -37,16 +38,42 @@ final class GameSettingsDialogs {
 
     static void showControllerSettings(Activity activity, Host host) {
         host.pauseEmulationForMenu();
+        AppSettingsManager sm = host.getSettingsManager();
+        boolean skinned = sm.isControllerSkinEnabled();
+        int skinId = sm.getControllerSkinId();
+        
         String[] items = {
-                "Controller Layout: GBA SP Style",
+                "Controller Skin: " + (skinned ? "ON" : "OFF"),
+                "Select Skin: Style 0" + skinId,
                 "Button Size: Default",
                 "Button Opacity: Default"
         };
         new AlertDialog.Builder(activity)
                 .setTitle("Controller Settings")
-                .setItems(items, (dialog, which) -> showControllerPending(activity))
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        sm.setControllerSkinEnabled(!skinned);
+                        activity.recreate();
+                    } else if (which == 1) {
+                        showSkinPicker(activity, host);
+                    } else {
+                        showControllerPending(activity);
+                    }
+                })
                 .setNegativeButton("Cancel", (dialog, which) -> host.resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> host.resumeEmulationFromMenu())
+                .show();
+    }
+
+    private static void showSkinPicker(Activity activity, Host host) {
+        String[] skins = {"Style 01 (Original)", "Style 02", "Style 03"};
+        AppSettingsManager sm = host.getSettingsManager();
+        new AlertDialog.Builder(activity)
+                .setTitle("Select Skin Style")
+                .setSingleChoiceItems(skins, sm.getControllerSkinId() - 1, (dialog, which) -> {
+                    sm.setControllerSkinId(which + 1);
+                    activity.recreate();
+                })
                 .show();
     }
 

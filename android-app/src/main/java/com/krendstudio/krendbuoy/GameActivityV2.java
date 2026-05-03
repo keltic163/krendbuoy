@@ -2,21 +2,31 @@ package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,8 +53,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private boolean screenBorderEnabled = false;
     private int startupLoadStateSlot = 0;
     private SaveStateManager saveStateManager;
+    private CheatManager cheatManager;
+    private PokemonManager pokemonManager;
+    private MemoryScanner memoryScanner;
     private FrameLayout dimOverlay;
     private View screenBorder;
+    
+    // Performance optimization for state slots
+    private final Map<Integer, Bitmap> thumbnailCache = new HashMap<>();
+    private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +75,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         colorCorrectionEnabled = settingsManager.isColorCorrectionEnabled();
         bgDimmingLevel = settingsManager.getBgDimmingLevel();
         screenBorderEnabled = settingsManager.isScreenBorderEnabled();
+        pokemonManager = new PokemonManager();
+        memoryScanner = new MemoryScanner();
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > SaveStateManager.SLOT_COUNT) startupLoadStateSlot = 0;
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
@@ -158,8 +177,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         }
         romBaseName = result.romBaseName;
         saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
+        cheatManager = new CheatManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
         NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
         importPortableSramIfAvailable();
+        cheatManager.applyToCore();
+        if (pokemonManager != null) pokemonManager.detectVersion();
         loadStartupStateIfRequested();
         updateInfo("Running... speed " + emulationSpeedLabel() + " audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
         menuPaused = false;
@@ -212,6 +234,13 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     @Override
+    public void applyFrameHooks() {
+        if (pokemonManager != null) {
+            pokemonManager.applyLocks();
+        }
+    }
+
+    @Override
     public void updateFrameInfo(String text) {
         updateInfo(text);
     }
@@ -235,6 +264,26 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public void updatePortableSaveInfo(String text) {
         updateInfo(text);
+    }
+
+    @Override
+    public AppSettingsManager getSettingsManager() {
+        return settingsManager;
+    }
+
+    @Override
+    public CheatManager getCheatManager() {
+        return cheatManager;
+    }
+
+    @Override
+    public PokemonManager getPokemonManager() {
+        return pokemonManager;
+    }
+
+    @Override
+    public MemoryScanner getMemoryScanner() {
+        return memoryScanner;
     }
 
     @Override
@@ -275,6 +324,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     public void leaveGame() {
         if (finishingFromMenu) return;
         finishingFromMenu = true;
+        
+        // Auto-save to Slot 0 before exiting
+        try {
+            if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
+            byte[] data = NativeBridge.exportState();
+            Bitmap thumb = frameLoopManager.captureLastFrame();
+            saveStateManager.write(data, SaveStateManager.AUTO_SAVE_SLOT, thumb);
+        } catch (Throwable ignored) {}
+
         NativeBridge.saveSram();
         exportPortableSramIfEnabled();
         releaseAllButtons();
@@ -285,17 +343,19 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     public void showStateSlotDialog(boolean save) {
         pauseEmulationForMenu();
         if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
-        String[] labels = new String[SaveStateManager.SLOT_COUNT];
-        for (int i = 0; i < labels.length; i++) labels[i] = saveStateManager.slotLabel(i + 1);
-        new AlertDialog.Builder(this)
-                .setTitle(save ? "Save State" : "Load State")
-                .setItems(labels, (dialog, which) -> {
-                    if (save) confirmAndSaveState(which + 1);
-                    else loadStateNow(which + 1);
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
-                .setOnCancelListener(dialog -> resumeEmulationFromMenu())
-                .show();
+        
+        StateDialogHelper.show(this, save ? "Save State" : "Load State", saveStateManager, thumbnailCache, new StateDialogHelper.Callback() {
+            @Override
+            public void onSlotSelected(int slot) {
+                if (save) confirmAndSaveState(slot);
+                else loadStateNow(slot);
+            }
+
+            @Override
+            public void onDismiss() {
+                resumeEmulationFromMenu();
+            }
+        });
     }
 
     private void confirmAndSaveState(int slot) {
@@ -316,8 +376,14 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private void saveStateNow(int slot) {
         try {
             byte[] data = NativeBridge.exportState();
-            if (saveStateManager.write(data, slot)) showToast("Saved Slot " + slot);
-            else showToast("Save state write failed");
+            Bitmap thumb = frameLoopManager.captureLastFrame();
+            boolean ok = saveStateManager.write(data, slot, thumb);
+            if (ok) {
+                if (thumb != null) thumbnailCache.put(slot, thumb);
+                showToast("Saved Slot " + slot);
+            } else {
+                showToast("Save state write failed");
+            }
         } catch (Throwable t) {
             showToast("Save state failed: " + safeMessage(t));
         }
@@ -535,6 +601,13 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         runOnUiThread(() -> {
             if (info != null) info.setText(text);
         });
+    }
+
+    private GradientDrawable makeRoundRect(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        return drawable;
     }
 
     @Override

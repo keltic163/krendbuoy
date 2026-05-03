@@ -77,6 +77,8 @@ typedef size_t (*retro_serialize_size_t)();
 typedef bool (*retro_serialize_t)(void*, size_t);
 typedef bool (*retro_unserialize_t)(const void*, size_t);
 typedef void (*retro_run_t)();
+typedef void (*retro_cheat_reset_t)();
+typedef void (*retro_cheat_set_t)(unsigned, bool, const char*);
 
 static retro_init_t p_retro_init = nullptr;
 static retro_deinit_t p_retro_deinit = nullptr;
@@ -97,6 +99,8 @@ static retro_serialize_size_t p_retro_serialize_size = nullptr;
 static retro_serialize_t p_retro_serialize = nullptr;
 static retro_unserialize_t p_retro_unserialize = nullptr;
 static retro_run_t p_retro_run = nullptr;
+static retro_cheat_reset_t p_retro_cheat_reset = nullptr;
+static retro_cheat_set_t p_retro_cheat_set = nullptr;
 
 static void fail(const std::string& s) { last = s; LOGE("%s", s.c_str()); }
 
@@ -277,6 +281,8 @@ static bool initCore() {
     p_retro_serialize_size = reinterpret_cast<retro_serialize_size_t>(dlsym(core, "retro_serialize_size"));
     p_retro_serialize = reinterpret_cast<retro_serialize_t>(dlsym(core, "retro_serialize"));
     p_retro_unserialize = reinterpret_cast<retro_unserialize_t>(dlsym(core, "retro_unserialize"));
+    p_retro_cheat_reset = reinterpret_cast<retro_cheat_reset_t>(dlsym(core, "retro_cheat_reset"));
+    p_retro_cheat_set = reinterpret_cast<retro_cheat_set_t>(dlsym(core, "retro_cheat_set"));
     p_retro_set_controller_port_device = reinterpret_cast<retro_set_controller_port_device_t>(dlsym(core, "retro_set_controller_port_device"));
     p_retro_set_environment(envCb);
     p_retro_set_video_refresh(videoCb);
@@ -424,4 +430,66 @@ extern "C" JNIEXPORT void JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_un
     clearButtons(); clearAudio();
     if (loaded && p_retro_unload_game) p_retro_unload_game();
     loaded = false; romData.clear(); last = "ROM unloaded.";
+}
+extern "C" JNIEXPORT void JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_cheatReset(JNIEnv*, jclass) {
+    if (loaded && p_retro_cheat_reset) p_retro_cheat_reset();
+}
+extern "C" JNIEXPORT void JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_cheatSet(JNIEnv* env, jclass, jint index, jboolean enabled, jstring code) {
+    if (!loaded || !p_retro_cheat_set) return;
+    const char* raw = code ? env->GetStringUTFChars(code, nullptr) : nullptr;
+    p_retro_cheat_set(static_cast<unsigned>(index), enabled == JNI_TRUE, raw ? raw : "");
+    if (raw) env->ReleaseStringUTFChars(code, raw);
+}
+extern "C" JNIEXPORT jbyteArray JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_readMemory(JNIEnv* env, jclass, jint address, jint size) {
+    if (!loaded || size <= 0) return nullptr;
+
+    uint32_t addr = static_cast<uint32_t>(address);
+    uint32_t region = addr >> 24;
+    uint32_t offset = addr & 0x00FFFFFF;
+    unsigned retro_id = 0;
+
+    switch (region) {
+        case 0x02: retro_id = RETRO_MEMORY_SYSTEM_RAM; break;
+        case 0x03: retro_id = RETRO_MEMORY_INTERNAL_RAM; break;
+        case 0x06: retro_id = RETRO_MEMORY_VIDEO_RAM; break;
+        case 0x08: retro_id = RETRO_MEMORY_ROM; break;
+        default: return nullptr;
+    }
+
+    void* data = p_retro_get_memory_data(retro_id);
+    size_t total_size = p_retro_get_memory_size(retro_id);
+
+    if (!data || offset >= total_size) return nullptr;
+    size_t available = total_size - offset;
+    size_t copy_size = std::min(static_cast<size_t>(size), available);
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(copy_size));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(copy_size), reinterpret_cast<const jbyte*>(static_cast<uint8_t*>(data) + offset));
+    return result;
+}
+extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_writeMemory(JNIEnv* env, jclass, jint address, jbyteArray input) {
+    if (!loaded || !input) return JNI_FALSE;
+
+    uint32_t addr = static_cast<uint32_t>(address);
+    uint32_t region = addr >> 24;
+    uint32_t offset = addr & 0x00FFFFFF;
+    unsigned retro_id = 0;
+
+    switch (region) {
+        case 0x02: retro_id = RETRO_MEMORY_SYSTEM_RAM; break;
+        case 0x03: retro_id = RETRO_MEMORY_INTERNAL_RAM; break;
+        case 0x06: retro_id = RETRO_MEMORY_VIDEO_RAM; break;
+        default: return JNI_FALSE; // ROM (0x08) is read-only
+    }
+
+    void* data = p_retro_get_memory_data(retro_id);
+    size_t total_size = p_retro_get_memory_size(retro_id);
+
+    jsize inputSize = env->GetArrayLength(input);
+    if (!data || offset >= total_size) return JNI_FALSE;
+    size_t available = total_size - offset;
+    size_t copy_size = std::min(static_cast<size_t>(inputSize), available);
+
+    env->GetByteArrayRegion(input, 0, static_cast<jsize>(copy_size), reinterpret_cast<jbyte*>(static_cast<uint8_t*>(data) + offset));
+    return JNI_TRUE;
 }

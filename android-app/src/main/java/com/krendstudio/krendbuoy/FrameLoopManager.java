@@ -10,12 +10,15 @@ final class FrameLoopManager {
         void runOnUiThread(Runnable action);
         String audioPresetLabelForFrameLoop();
         int emulationSpeedMultiplierForFrameLoop();
+        void applyFrameHooks();
     }
 
     private final Host host;
     private final ImageView screen;
     private volatile boolean running;
     private Thread frameThread;
+    private final Object bitmapLock = new Object();
+    private Bitmap lastBitmap;
 
     FrameLoopManager(Host host, ImageView screen) {
         this.host = host;
@@ -47,6 +50,9 @@ final class FrameLoopManager {
                         ok = false;
                         break;
                     }
+                    // Apply any memory hacks/locks every frame
+                    host.applyFrameHooks();
+
                     width = NativeBridge.getFrameWidth();
                     height = NativeBridge.getFrameHeight();
                     pixels = NativeBridge.copyFramePixels();
@@ -56,6 +62,9 @@ final class FrameLoopManager {
                 if (ok) {
                     if (width > 0 && height > 0 && pixels != null && pixels.length == width * height) {
                         Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
+                        synchronized (bitmapLock) {
+                            lastBitmap = bitmap;
+                        }
                         host.runOnUiThread(() -> screen.setImageBitmap(bitmap));
                     }
                     if (frame % 30 == 0) {
@@ -91,6 +100,13 @@ final class FrameLoopManager {
 
     boolean isRunning() {
         return running;
+    }
+
+    Bitmap captureLastFrame() {
+        synchronized (bitmapLock) {
+            if (lastBitmap == null) return null;
+            return Bitmap.createBitmap(lastBitmap);
+        }
     }
 
     private void sleepQuietly(long millis) {

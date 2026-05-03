@@ -2,6 +2,8 @@ package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.provider.DocumentsContract;
 
@@ -13,15 +15,25 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 final class SaveStateManager {
     static final int SLOT_COUNT = 10;
+    static final int AUTO_SAVE_SLOT = 0;
     private static final String STATE_DIR_NAME = "KrendBuoy States";
     private final Activity activity;
     private final Uri portableSaveFolderUri;
     private final File fallbackStateRoot;
     private final String romBaseName;
+    
+    // Performance: Cache file references in the directory
+    private final Map<String, Long> fileTimeCache = new HashMap<>();
+    private final Set<String> filesExist = new HashSet<>();
+    private boolean directoryScanned = false;
 
     SaveStateManager(Activity activity, Uri portableSaveFolderUri, File fallbackStateRoot, String romBaseName) {
         this.activity = activity;
@@ -32,28 +44,77 @@ final class SaveStateManager {
 
     String slotLabel(int slot) {
         long modified = getModifiedTime(slot);
-        if (modified <= 0) return "Slot " + slot + " - Empty";
-        return "Slot " + slot + " - " + new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(modified));
+        String prefix = (slot == AUTO_SAVE_SLOT) ? "Auto-Save" : "Slot " + slot;
+        if (modified <= 0) return prefix + " - Empty";
+        return prefix + " - " + new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(modified));
     }
 
-    long getModifiedTime(int slot) {
+    void refreshDirectoryCache() {
+        directoryScanned = false;
+        fileTimeCache.clear();
+        filesExist.clear();
         try {
             if (portableSaveFolderUri != null) {
                 Uri dir = getOrCreatePortableStateDir();
-                return dir == null ? 0 : findChildModifiedTime(dir, stateFileName(slot));
+                if (dir == null) return;
+                Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(portableSaveFolderUri, DocumentsContract.getDocumentId(dir));
+                try (Cursor cursor = activity.getContentResolver().query(children, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
+                    if (cursor != null) {
+                        while (cursor.moveToNext()) {
+                            String name = cursor.getString(0);
+                            long time = cursor.getLong(1);
+                            fileTimeCache.put(name, time);
+                            filesExist.add(name);
+                        }
+                    }
+                }
+            } else {
+                File dir = new File(fallbackStateRoot, sanitize(romBaseName));
+                File[] files = dir.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        fileTimeCache.put(f.getName(), f.lastModified());
+                        filesExist.add(f.getName());
+                    }
+                }
             }
-            File file = new File(new File(fallbackStateRoot, sanitize(romBaseName)), stateFileName(slot));
-            return file.exists() ? file.lastModified() : 0;
-        } catch (Throwable ignored) {
-            return 0;
-        }
+            directoryScanned = true;
+        } catch (Throwable ignored) {}
     }
 
-    boolean write(byte[] data, int slot) throws Exception {
+    long getModifiedTime(int slot) {
+        if (!directoryScanned) refreshDirectoryCache();
+        Long time = fileTimeCache.get(stateFileName(slot));
+        return time != null ? time : 0;
+    }
+
+    Bitmap getThumbnail(int slot) {
+        String thumbName = thumbnailFileName(slot);
+        if (!directoryScanned) refreshDirectoryCache();
+        if (!filesExist.contains(thumbName)) return null;
+
+        try {
+            if (portableSaveFolderUri != null) {
+                Uri dir = getOrCreatePortableStateDir();
+                Uri thumb = findChildDocument(dir, thumbName);
+                if (thumb == null) return null;
+                try (InputStream in = activity.getContentResolver().openInputStream(thumb)) {
+                    return BitmapFactory.decodeStream(in);
+                }
+            }
+            File file = new File(new File(fallbackStateRoot, sanitize(romBaseName)), thumbName);
+            return BitmapFactory.decodeFile(file.getAbsolutePath());
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    boolean write(byte[] data, int slot, Bitmap thumbnail) throws Exception {
         if (data == null || data.length == 0) return false;
         if (portableSaveFolderUri != null) {
             Uri dir = getOrCreatePortableStateDir();
             if (dir == null) return false;
+            
+            // Save state
             Uri target = findChildDocument(dir, stateFileName(slot));
             if (target == null) target = DocumentsContract.createDocument(activity.getContentResolver(), dir, "application/octet-stream", stateFileName(slot));
             if (target == null) return false;
@@ -61,16 +122,39 @@ final class SaveStateManager {
                 if (out == null) return false;
                 out.write(data);
                 out.flush();
-                return true;
             }
+
+            // Save thumbnail
+            if (thumbnail != null) {
+                Uri thumbTarget = findChildDocument(dir, thumbnailFileName(slot));
+                if (thumbTarget == null) thumbTarget = DocumentsContract.createDocument(activity.getContentResolver(), dir, "image/png", thumbnailFileName(slot));
+                if (thumbTarget != null) {
+                    try (OutputStream out = activity.getContentResolver().openOutputStream(thumbTarget, "wt")) {
+                        thumbnail.compress(Bitmap.CompressFormat.PNG, 90, out);
+                        out.flush();
+                    }
+                }
+            }
+            return true;
         }
+
         File dir = new File(fallbackStateRoot, sanitize(romBaseName));
         if (!dir.exists() && !dir.mkdirs()) return false;
+
+        // Save state
         try (FileOutputStream out = new FileOutputStream(new File(dir, stateFileName(slot)))) {
             out.write(data);
             out.flush();
-            return true;
         }
+
+        // Save thumbnail
+        if (thumbnail != null) {
+            try (FileOutputStream out = new FileOutputStream(new File(dir, thumbnailFileName(slot)))) {
+                thumbnail.compress(Bitmap.CompressFormat.PNG, 90, out);
+                out.flush();
+            }
+        }
+        return true;
     }
 
     byte[] read(int slot) throws Exception {
@@ -91,6 +175,10 @@ final class SaveStateManager {
 
     String stateFileName(int slot) {
         return sanitize(romBaseName) + ".slot" + slot + ".state";
+    }
+
+    String thumbnailFileName(int slot) {
+        return sanitize(romBaseName) + ".slot" + slot + ".png";
     }
 
     private Uri getOrCreatePortableStateDir() throws Exception {

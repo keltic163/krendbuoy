@@ -70,6 +70,7 @@ static unsigned systemWidth = gbaWidth;
 static unsigned systemHeight = gbaHeight;
 static EmulatedSystem* core = NULL;
 static IMAGE_TYPE type = IMAGE_UNKNOWN;
+static int romSize = 0;
 static bool libretro_supports_bitmasks = false;
 static bool enable_variable_serialization_size;
 
@@ -331,6 +332,12 @@ void* retro_get_memory_data(unsigned id)
         case RETRO_MEMORY_VIDEO_RAM:
             data = g_vram;
             break;
+        case RETRO_MEMORY_INTERNAL_RAM:
+            data = g_internalRAM;
+            break;
+        case RETRO_MEMORY_ROM:
+            data = g_rom;
+            break;
         }
         break;
 
@@ -378,6 +385,12 @@ size_t retro_get_memory_size(unsigned id)
             break;
         case RETRO_MEMORY_VIDEO_RAM:
             size = SIZE_VRAM - 0x2000; // usuable g_vram is only 0x18000
+            break;
+        case RETRO_MEMORY_INTERNAL_RAM:
+            size = SIZE_IRAM;
+            break;
+        case RETRO_MEMORY_ROM:
+            size = (size_t)romSize;
             break;
         }
         break;
@@ -828,8 +841,6 @@ bool find_string(const uint8_t* buf, size_t size, const char* str) {
 
     return false;
 }
-
-static int romSize = 0;
 
 static void load_image_preferences(void)
 {

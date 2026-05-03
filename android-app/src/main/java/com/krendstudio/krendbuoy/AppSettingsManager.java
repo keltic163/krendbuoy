@@ -32,6 +32,11 @@ final class AppSettingsManager {
     private static final String KEY_CONTROLLER_LAYOUT = "controller_layout";
     private static final String KEY_BUTTON_SIZE = "button_size";
     private static final String KEY_BUTTON_OPACITY = "button_opacity";
+    private static final String KEY_USE_CONTROLLER_SKIN = "use_controller_skin";
+    private static final String KEY_CONTROLLER_SKIN_ID = "controller_skin_id";
+    private static final String KEY_BTN_X_PREFIX = "btn_x_";
+    private static final String KEY_BTN_Y_PREFIX = "btn_y_";
+    private static final String KEY_LAST_TRAINER_ID = "last_trainer_id";
 
     private final SharedPreferences prefs;
 
@@ -126,6 +131,52 @@ final class AppSettingsManager {
 
     void setButtonOpacity(int value) {
         prefs.edit().putInt(KEY_BUTTON_OPACITY, value).apply();
+    }
+
+    boolean isControllerSkinEnabled() {
+        return prefs.getBoolean(KEY_USE_CONTROLLER_SKIN, true);
+    }
+
+    void setControllerSkinEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_USE_CONTROLLER_SKIN, enabled).apply();
+    }
+
+    int getControllerSkinId() {
+        return prefs.getInt(KEY_CONTROLLER_SKIN_ID, 1); // Default to 01
+    }
+
+    void setControllerSkinId(int id) {
+        prefs.edit().putInt(KEY_CONTROLLER_SKIN_ID, id).apply();
+    }
+
+    float getButtonPosX(int buttonId, float def) {
+        return prefs.getFloat(KEY_BTN_X_PREFIX + buttonId, def);
+    }
+
+    float getButtonPosY(int buttonId, float def) {
+        return prefs.getFloat(KEY_BTN_Y_PREFIX + buttonId, def);
+    }
+
+    void setButtonPos(int buttonId, float x, float y) {
+        prefs.edit().putFloat(KEY_BTN_X_PREFIX + buttonId, x).putFloat(KEY_BTN_Y_PREFIX + buttonId, y).apply();
+    }
+
+    String getLastTrainerId() {
+        return prefs.getString(KEY_LAST_TRAINER_ID, "");
+    }
+
+    void setLastTrainerId(String id) {
+        prefs.edit().putString(KEY_LAST_TRAINER_ID, id).apply();
+    }
+
+    void resetAllButtonPos() {
+        SharedPreferences.Editor editor = prefs.edit();
+        for (String key : prefs.getAll().keySet()) {
+            if (key.startsWith(KEY_BTN_X_PREFIX) || key.startsWith(KEY_BTN_Y_PREFIX)) {
+                editor.remove(key);
+            }
+        }
+        editor.apply();
     }
 
     static int normalizeAudioPreset(int value) {
