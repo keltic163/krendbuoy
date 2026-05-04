@@ -173,21 +173,55 @@ public class PokemonManager {
         }
     }
 
+    private int getPocketOffset(Pocket targetPocket) {
+        if (targetPocket == Pocket.ITEMS) return offItems;
+        if (targetPocket == Pocket.KEY_ITEMS) return offKey;
+        if (targetPocket == Pocket.BALLS) return offBalls;
+        if (targetPocket == Pocket.TM_HM) return offTM;
+        if (targetPocket == Pocket.BERRIES) return offBerries;
+        return 0;
+    }
+
+    private int getPocketCapacity(GameVersion version, Pocket targetPocket) {
+        if (targetPocket == null) return 0;
+        boolean emerald = version == GameVersion.EMERALD;
+        if (targetPocket == Pocket.BALLS) return emerald ? 20 : 15;
+        return emerald ? 50 : 30;
+    }
+
+    private int findFirstEmptyPocketSlot(Pocket targetPocket) {
+        if (saveBlock1Addr == 0 || securityKey == 0) return -1;
+
+        int off = getPocketOffset(targetPocket);
+        int max = getPocketCapacity(detectVersion(), targetPocket);
+        if (off == 0 || max <= 0) return -1;
+
+        byte[] data = NativeBridge.readMemory(saveBlock1Addr + off, max * 4);
+        if (data == null) return -1;
+
+        ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < max; i++) {
+            int pos = i * 4;
+            if (pos + 2 > data.length) break;
+
+            int id = bb.getShort(pos) & 0xFFFF;
+            if (id == 0 || id == 0x116 || id == 0x169) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     public List<ItemSlot> getBagItems(Pocket targetPocket) {
         List<ItemSlot> items = new ArrayList<>();
         if (saveBlock1Addr == 0 || securityKey == 0) return items;
         int xorPart = securityKey & 0xFFFF;
-        int off = 0;
-        if (targetPocket == Pocket.ITEMS) off = offItems;
-        else if (targetPocket == Pocket.KEY_ITEMS) off = offKey;
-        else if (targetPocket == Pocket.BALLS) off = offBalls;
-        else if (targetPocket == Pocket.TM_HM) off = offTM;
-        else if (targetPocket == Pocket.BERRIES) off = offBerries;
-        
+        int off = getPocketOffset(targetPocket);
+
         if (off == 0) return items;
-        GameVersion v = detectVersion();
-        int max = (v == GameVersion.EMERALD) ? 50 : 30;
-        if (targetPocket == Pocket.BALLS) max = (v == GameVersion.EMERALD) ? 20 : 15;
+        int max = getPocketCapacity(detectVersion(), targetPocket);
+        if (max <= 0) return items;
 
         byte[] data = NativeBridge.readMemory(saveBlock1Addr + off, max * 4);
         if (data == null) return items;
@@ -206,30 +240,27 @@ public class PokemonManager {
         return items;
     }
 
-    public void setBagItem(int slotIndex, int itemId, int count, Pocket p) {
-        if (saveBlock1Addr == 0) return;
-        int off = 0;
-        if (p == Pocket.ITEMS) off = offItems;
-        else if (p == Pocket.KEY_ITEMS) off = offKey;
-        else if (p == Pocket.BALLS) off = offBalls;
-        else if (p == Pocket.TM_HM) off = offTM;
-        else if (p == Pocket.BERRIES) off = offBerries;
-        if (off == 0) return;
+    public boolean setBagItem(int slotIndex, int itemId, int count, Pocket p) {
+        if (saveBlock1Addr == 0 || securityKey == 0) return false;
+
+        int off = getPocketOffset(p);
+        if (off == 0) return false;
+
+        int max = getPocketCapacity(detectVersion(), p);
+        if (slotIndex < 0 || slotIndex >= max) return false;
 
         int addr = saveBlock1Addr + off + (slotIndex * 4);
         int xorPart = securityKey & 0xFFFF;
         int toWrite = (p == Pocket.KEY_ITEMS || itemId > 0x100) ? count : ((count & 0xFFFF) ^ xorPart);
         ByteBuffer bb = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
         bb.putShort((short)itemId); bb.putShort((short)toWrite);
-        NativeBridge.writeMemory(addr, bb.array());
+        return NativeBridge.writeMemory(addr, bb.array());
     }
 
     public boolean addBagItem(int itemId, int count, Pocket p) {
-        if (saveBlock1Addr == 0) return false;
-        List<ItemSlot> current = getBagItems(p);
-        if (current.size() >= 30) return false;
-        setBagItem(current.size(), itemId, count, p);
-        return true;
+        int slot = findFirstEmptyPocketSlot(p);
+        if (slot < 0) return false;
+        return setBagItem(slot, itemId, count, p);
     }
 
     public List<ItemInfo> getCommonItems(Pocket p) { return PokemonConstants.getCommonItems(p); }
