@@ -273,6 +273,8 @@ public class PokemonManager {
         if (data == null) return GameVersion.UNKNOWN;
         String name = new String(data).toUpperCase();
         if (name.contains("GLAZED") || name.contains("POKEMON EMER")) return GameVersion.EMERALD;
+        if (name.contains("POKEMON FIRE")) return GameVersion.FIRE_RED;
+        if (name.contains("POKEMON LEAF")) return GameVersion.LEAF_GREEN;
         return GameVersion.FIRE_RED;
     }
 }
