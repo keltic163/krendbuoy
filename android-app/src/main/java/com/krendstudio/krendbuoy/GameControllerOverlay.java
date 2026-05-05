@@ -304,6 +304,22 @@ final class GameControllerOverlay {
     private static void buildPokemonToolsSection(Activity activity, Host host, LinearLayout root, Runnable refreshAll) {
         PokemonManager pm = host.getPokemonManager(); if (pm == null) return;
         TextView pt = new TextView(activity); pt.setText("Pokemon Tools & Debugger"); pt.setTextColor(Color.rgb(61, 155, 235)); pt.setTypeface(null, Typeface.BOLD); pt.setTextSize(14f); root.addView(pt);
+        TextView versionInfo = new TextView(activity);
+        PokemonConstants.GameVersion autoVersion = pm.detectVersion();
+        PokemonConstants.GameVersion effectiveVersion = pm.getEffectiveVersion();
+        String versionText = pm.isManualVersionSelected()
+                ? "Version: Manual " + pm.getManualVersion() + " | Auto: " + autoVersion
+                : "Version: Auto " + effectiveVersion;
+
+        if (effectiveVersion == PokemonConstants.GameVersion.UNKNOWN) {
+            versionText += "\nUnknown ROM. Please set version manually.";
+        }
+
+        versionInfo.setText(versionText);
+        versionInfo.setTextColor(effectiveVersion == PokemonConstants.GameVersion.UNKNOWN ? Color.YELLOW : Color.LTGRAY);
+        versionInfo.setTextSize(11f);
+        versionInfo.setPadding(0, host.dp(4), 0, host.dp(8));
+        root.addView(versionInfo);
         LinearLayout mr = new LinearLayout(activity); mr.setOrientation(LinearLayout.HORIZONTAL); mr.setGravity(Gravity.CENTER_VERTICAL); mr.setPadding(0, host.dp(8), 0, host.dp(12));
         TextView mv = new TextView(activity); int m = pm.getMoney(); mv.setText("Money: $" + (m == -1 ? "???" : m)); mv.setTextColor(pm.isMoneyLocked() ? Color.CYAN : Color.YELLOW); mv.setTextSize(16f); mr.addView(mv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (pm.isMoneyLocked()) {
@@ -357,7 +373,7 @@ final class GameControllerOverlay {
                 } catch (Exception ignored) {}
             }).setNegativeButton("Cancel", null).show();
         }), new LinearLayout.LayoutParams(0, host.dp(32), 1f)); r2.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
-        r2.addView(makeSystemButton(activity, "Version Detect", () -> { Toast.makeText(activity, "Detected: " + pm.detectVersion(), Toast.LENGTH_SHORT).show(); refreshAll.run(); }), new LinearLayout.LayoutParams(0, host.dp(32), 1f)); r2.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
+        r2.addView(makeSystemButton(activity, "Set Version", () -> showPokemonVersionDialog(activity, pm, refreshAll)), new LinearLayout.LayoutParams(0, host.dp(32), 1f)); r2.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
         r2.addView(makeSystemButton(activity, "Auto Locate", () -> { pm.autoLocateByPointers(); refreshAll.run(); }), new LinearLayout.LayoutParams(0, host.dp(32), 1f)); dc.addView(r2); root.addView(dc);
         
         MemoryScanner ms = host.getMemoryScanner();
@@ -417,6 +433,44 @@ final class GameControllerOverlay {
         android.widget.EditText in = new android.widget.EditText(a); in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         new AlertDialog.Builder(a).setTitle(title).setView(in).setPositiveButton("OK", (d, w) -> { try { cb.onValue(Integer.parseInt(in.getText().toString())); } catch (Exception ignored) {} }).setNegativeButton("Cancel", null).show();
     }
+
+    private static void showPokemonVersionDialog(Activity activity, PokemonManager pm, Runnable refreshAll) {
+    String[] labels = {
+            "Auto Detect",
+            "FireRed",
+            "LeafGreen",
+            "Ruby",
+            "Sapphire",
+            "Emerald / Glazed"
+    };
+
+    PokemonConstants.GameVersion[] versions = {
+            PokemonConstants.GameVersion.UNKNOWN,
+            PokemonConstants.GameVersion.FIRE_RED,
+            PokemonConstants.GameVersion.LEAF_GREEN,
+            PokemonConstants.GameVersion.RUBY,
+            PokemonConstants.GameVersion.SAPPHIRE,
+            PokemonConstants.GameVersion.EMERALD
+    };
+
+    new AlertDialog.Builder(activity)
+            .setTitle("Set Pokémon Version")
+            .setItems(labels, (dialog, which) -> {
+                PokemonConstants.GameVersion selected = versions[which];
+
+                if (selected == PokemonConstants.GameVersion.UNKNOWN) {
+                    pm.clearManualVersion();
+                    Toast.makeText(activity, "Version set to Auto Detect", Toast.LENGTH_SHORT).show();
+                } else {
+                    pm.setVersion(selected);
+                    Toast.makeText(activity, "Version set to " + selected, Toast.LENGTH_SHORT).show();
+                }
+
+                refreshAll.run();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+}
 
     private static void handleEditTouch(MotionEvent event) {
         int action = event.getActionMasked(); float x = event.getX(), y = event.getY();
