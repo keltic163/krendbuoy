@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PokemonConstants {
-    public enum GameVersion { UNKNOWN, FIRE_RED, LEAF_GREEN, EMERALD }
+    public enum GameVersion { UNKNOWN, FIRE_RED, LEAF_GREEN, RUBY, SAPPHIRE, EMERALD }
     public enum Pocket { ITEMS, BALLS, KEY_ITEMS, BERRIES, TM_HM }
 
     public static class ItemSlot {
