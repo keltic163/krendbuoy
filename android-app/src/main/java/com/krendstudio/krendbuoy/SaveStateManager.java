@@ -61,15 +61,12 @@ final class SaveStateManager {
                 scanPortableDirectory(dir);
             } else {
                 File root = fallbackStateRoot;
-                File dir = new File(root, sanitize(romBaseName));
                 ensureNoMedia(root);
-                ensureNoMedia(dir);
-                File[] files = dir.listFiles();
-                if (files != null) {
-                    for (File f : files) {
-                        fileTimeCache.put(f.getName(), f.lastModified());
-                        filesExist.add(f.getName());
-                    }
+                scanFallbackDirectory(new File(root, sanitize(romBaseName)));
+
+                String legacyDirName = legacySanitize(romBaseName);
+                if (!legacyDirName.equals(sanitize(romBaseName))) {
+                    scanFallbackDirectory(new File(root, legacyDirName));
                 }
             }
             directoryScanned = true;
@@ -79,28 +76,32 @@ final class SaveStateManager {
     long getModifiedTime(int slot) {
         if (!directoryScanned) refreshDirectoryCache();
         Long time = fileTimeCache.get(stateFileName(slot));
+        if (time == null) time = fileTimeCache.get(legacyStateFileName(slot));
         return time != null ? time : 0;
     }
 
     Bitmap getThumbnail(int slot) {
         String thumbName = thumbnailFileName(slot);
-        String legacyThumbName = legacyThumbnailFileName(slot);
+        String legacyPngName = legacyThumbnailFileName(slot);
+        String legacyAsciiThumbName = legacyAsciiThumbnailFileName(slot);
+        String legacyAsciiPngName = legacyAsciiPngThumbnailFileName(slot);
         if (!directoryScanned) refreshDirectoryCache();
-        if (!filesExist.contains(thumbName) && !filesExist.contains(legacyThumbName)) return null;
+        if (!filesExist.contains(thumbName)
+                && !filesExist.contains(legacyPngName)
+                && !filesExist.contains(legacyAsciiThumbName)
+                && !filesExist.contains(legacyAsciiPngName)) return null;
 
         try {
             if (portableSaveFolderUri != null) {
                 Uri dir = getOrCreatePortableStateDir();
-                Uri thumb = findChildDocument(dir, thumbName);
-                if (thumb == null) thumb = findChildDocument(dir, legacyThumbName);
+                Uri thumb = findFirstChildDocument(dir, thumbName, legacyPngName, legacyAsciiThumbName, legacyAsciiPngName);
                 if (thumb == null) return null;
                 try (InputStream in = activity.getContentResolver().openInputStream(thumb)) {
                     return BitmapFactory.decodeStream(in);
                 }
             }
-            File dir = new File(new File(fallbackStateRoot, sanitize(romBaseName)), thumbName);
-            if (!dir.exists()) dir = new File(new File(fallbackStateRoot, sanitize(romBaseName)), legacyThumbName);
-            return BitmapFactory.decodeFile(dir.getAbsolutePath());
+            File thumb = findFirstFallbackFile(thumbName, legacyPngName, legacyAsciiThumbName, legacyAsciiPngName);
+            return thumb == null ? null : BitmapFactory.decodeFile(thumb.getAbsolutePath());
         } catch (Throwable ignored) {}
         return null;
     }
@@ -158,12 +159,12 @@ final class SaveStateManager {
         if (portableSaveFolderUri != null) {
             Uri dir = getOrCreatePortableStateDir();
             if (dir == null) return null;
-            Uri state = findChildDocument(dir, stateFileName(slot));
+            Uri state = findFirstChildDocument(dir, stateFileName(slot), legacyStateFileName(slot));
             if (state == null) return null;
             return readUriBytes(state);
         }
-        File file = new File(new File(fallbackStateRoot, sanitize(romBaseName)), stateFileName(slot));
-        if (!file.exists()) return null;
+        File file = findFirstFallbackFile(stateFileName(slot), legacyStateFileName(slot));
+        if (file == null || !file.exists()) return null;
         try (InputStream in = new FileInputStream(file); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             copy(in, out);
             return out.toByteArray();
@@ -178,8 +179,20 @@ final class SaveStateManager {
         return sanitize(romBaseName) + ".slot" + slot + ".thumb";
     }
 
+    private String legacyStateFileName(int slot) {
+        return legacySanitize(romBaseName) + ".slot" + slot + ".state";
+    }
+
     private String legacyThumbnailFileName(int slot) {
         return sanitize(romBaseName) + ".slot" + slot + ".png";
+    }
+
+    private String legacyAsciiThumbnailFileName(int slot) {
+        return legacySanitize(romBaseName) + ".slot" + slot + ".thumb";
+    }
+
+    private String legacyAsciiPngThumbnailFileName(int slot) {
+        return legacySanitize(romBaseName) + ".slot" + slot + ".png";
     }
 
     private Uri getOrCreatePortableStateDir() throws Exception {
@@ -193,6 +206,12 @@ final class SaveStateManager {
         if (romDir != null) {
             ensureNoMedia(romDir);
             migrateLegacyPortableFiles(root, romDir);
+
+            String legacyRomDirName = legacySanitize(romBaseName);
+            if (!legacyRomDirName.equals(romDirName)) {
+                Uri legacyRomDir = findChildDocument(root, legacyRomDirName);
+                if (legacyRomDir != null) migrateLegacyPortableFiles(legacyRomDir, romDir);
+            }
         }
         return romDir;
     }
@@ -219,10 +238,23 @@ final class SaveStateManager {
         }
     }
 
+    private void scanFallbackDirectory(File dir) {
+        ensureNoMedia(dir);
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            fileTimeCache.put(f.getName(), f.lastModified());
+            filesExist.add(f.getName());
+        }
+    }
+
     private void migrateLegacyPortableFiles(Uri legacyRoot, Uri romDir) {
         for (int slot = AUTO_SAVE_SLOT; slot <= SLOT_COUNT; slot++) {
             copyLegacyDocumentIfNeeded(legacyRoot, romDir, stateFileName(slot), stateFileName(slot), "application/octet-stream");
+            copyLegacyDocumentIfNeeded(legacyRoot, romDir, legacyStateFileName(slot), stateFileName(slot), "application/octet-stream");
             copyLegacyDocumentIfNeeded(legacyRoot, romDir, legacyThumbnailFileName(slot), thumbnailFileName(slot), "application/octet-stream");
+            copyLegacyDocumentIfNeeded(legacyRoot, romDir, legacyAsciiPngThumbnailFileName(slot), thumbnailFileName(slot), "application/octet-stream");
+            copyLegacyDocumentIfNeeded(legacyRoot, romDir, legacyAsciiThumbnailFileName(slot), thumbnailFileName(slot), "application/octet-stream");
             copyLegacyDocumentIfNeeded(legacyRoot, romDir, thumbnailFileName(slot), thumbnailFileName(slot), "application/octet-stream");
         }
     }
@@ -263,6 +295,30 @@ final class SaveStateManager {
         } catch (Throwable ignored) {}
     }
 
+    private Uri findFirstChildDocument(Uri parent, String... names) {
+        if (parent == null || names == null) return null;
+        for (String name : names) {
+            Uri child = findChildDocument(parent, name);
+            if (child != null) return child;
+        }
+        return null;
+    }
+
+    private File findFirstFallbackFile(String... names) {
+        if (names == null) return null;
+        File newDir = new File(fallbackStateRoot, sanitize(romBaseName));
+        File legacyDir = new File(fallbackStateRoot, legacySanitize(romBaseName));
+        for (String name : names) {
+            File file = new File(newDir, name);
+            if (file.exists()) return file;
+            if (!legacyDir.equals(newDir)) {
+                file = new File(legacyDir, name);
+                if (file.exists()) return file;
+            }
+        }
+        return null;
+    }
+
     private Uri findChildDocument(Uri parent, String name) {
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(portableSaveFolderUri, DocumentsContract.getDocumentId(parent));
         try (Cursor cursor = activity.getContentResolver().query(children, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID}, null, null, null)) {
@@ -289,7 +345,16 @@ final class SaveStateManager {
     }
 
     private String sanitize(String input) {
-        if (input == null) return "";
-        return input.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (input == null) return "selected";
+        String value = input.trim().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+        value = value.replaceAll("^[.]+", "_").trim();
+        if (value.isEmpty() || ".".equals(value) || "..".equals(value)) return "selected";
+        return value;
+    }
+
+    private String legacySanitize(String input) {
+        if (input == null) return "selected";
+        String value = input.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return value.isEmpty() ? "selected" : value;
     }
 }
