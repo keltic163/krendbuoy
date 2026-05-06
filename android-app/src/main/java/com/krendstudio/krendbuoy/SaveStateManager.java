@@ -116,7 +116,7 @@ final class SaveStateManager {
 
             if (thumbnail != null) {
                 Uri thumbTarget = portableFileMap.get(tName);
-                if (thumbTarget == null) thumbTarget = DocumentsContract.createDocument(activity.getContentResolver(), dir, "image/png", tName);
+                if (thumbTarget == null) thumbTarget = DocumentsContract.createDocument(activity.getContentResolver(), dir, "application/octet-stream", tName);
                 if (thumbTarget != null) {
                     try (OutputStream out = activity.getContentResolver().openOutputStream(thumbTarget, "wt")) {
                         thumbnail.compress(Bitmap.CompressFormat.PNG, 90, out);
@@ -170,7 +170,7 @@ final class SaveStateManager {
     }
 
     String thumbnailFileName(int slot) {
-        return sanitize(romBaseName) + ".slot" + slot + ".png";
+        return sanitize(romBaseName) + ".slot" + slot + ".thumb";
     }
 
     private Uri getOrCreatePortableStateDir() throws Exception {
