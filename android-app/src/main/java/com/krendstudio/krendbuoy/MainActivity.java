@@ -469,8 +469,23 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     private long getStateModifiedTime(String baseName, int slot) {
         Uri stateDir = findRootChild(STATE_FOLDER_NAME);
         if (stateDir == null) return 0;
-        String fileName = sanitizeFileName(baseName) + ".slot" + slot + ".state";
-        return findChildModifiedTimeIn(stateDir, fileName);
+        
+        // Match the sanitize logic in SaveStateManager
+        String cleanBase = sanitizeFileName(baseName);
+        Uri romDir = findChildIn(stateDir, cleanBase);
+        if (romDir == null) {
+            // Check legacy folder too
+            romDir = findChildIn(stateDir, legacySanitizeFileName(baseName));
+        }
+        
+        if (romDir != null) {
+            String fileName = cleanBase + ".slot" + slot + ".state";
+            return findChildModifiedTimeIn(romDir, fileName);
+        }
+        
+        // Backward compatibility: check directly in stateRoot
+        String directFileName = cleanBase + ".slot" + slot + ".state";
+        return findChildModifiedTimeIn(stateDir, directFileName);
     }
 
     private String formatTimestamp(long timestamp) {
@@ -573,7 +588,19 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
 
     private boolean isSupportedRomName(String name) { if (name == null) return false; String lower = name.toLowerCase(); return lower.endsWith(".gba") || lower.endsWith(".gbc") || lower.endsWith(".gb"); }
     private String removeKnownRomExtension(String name) { if (name == null || name.isEmpty()) return "selected"; String lower = name.toLowerCase(); if (lower.endsWith(".gba") || lower.endsWith(".gbc")) return name.substring(0, name.length() - 4); if (lower.endsWith(".gb")) return name.substring(0, name.length() - 3); return name; }
-    private String sanitizeFileName(String input) { if (input == null) return ""; return input.replaceAll("[^a-zA-Z0-9._-]", "_"); }
+    private String sanitizeFileName(String input) {
+        if (input == null) return "selected";
+        String value = input.trim().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+        value = value.replaceAll("^[.]+", "_").trim();
+        if (value.isEmpty() || ".".equals(value) || "..".equals(value)) return "selected";
+        return value;
+    }
+
+    private String legacySanitizeFileName(String input) {
+        if (input == null) return "selected";
+        String value = input.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return value.isEmpty() ? "selected" : value;
+    }
     private String displayFolderPath(Uri uri) { try { String treeId = DocumentsContract.getTreeDocumentId(uri); if (treeId.startsWith("primary:")) return "/storage/emulated/0/" + treeId.substring("primary:".length()); return treeId; } catch (Throwable ignored) { return uri.toString(); } }
     private TextView sectionTitle(String text) { TextView title = new TextView(this); title.setText(text); title.setTextColor(Color.WHITE); title.setTypeface(Typeface.DEFAULT_BOLD); title.setTextSize(18f); return title; }
     private TextView bodyCard(String text) { TextView card = new TextView(this); card.setText(text); card.setTextColor(Color.rgb(205, 213, 225)); card.setTextSize(14f); card.setPadding(dp(12), dp(12), dp(12), dp(12)); card.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(10))); return card; }
