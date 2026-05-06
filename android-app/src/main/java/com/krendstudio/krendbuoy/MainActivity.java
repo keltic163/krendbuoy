@@ -470,22 +470,14 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         Uri stateDir = findRootChild(STATE_FOLDER_NAME);
         if (stateDir == null) return 0;
         
-        // Match the sanitize logic in SaveStateManager
         String cleanBase = sanitizeFileName(baseName);
         Uri romDir = findChildIn(stateDir, cleanBase);
-        if (romDir == null) {
-            // Check legacy folder too
-            romDir = findChildIn(stateDir, legacySanitizeFileName(baseName));
-        }
         
         if (romDir != null) {
             String fileName = cleanBase + ".slot" + slot + ".state";
             return findChildModifiedTimeIn(romDir, fileName);
         }
-        
-        // Backward compatibility: check directly in stateRoot
-        String directFileName = cleanBase + ".slot" + slot + ".state";
-        return findChildModifiedTimeIn(stateDir, directFileName);
+        return 0;
     }
 
     private String formatTimestamp(long timestamp) {
