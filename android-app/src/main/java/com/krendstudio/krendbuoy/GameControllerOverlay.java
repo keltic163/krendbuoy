@@ -1,7 +1,6 @@
 package com.krendstudio.krendbuoy;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -9,16 +8,10 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,10 +70,10 @@ final class GameControllerOverlay {
         FrameLayout.LayoutParams titleLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT);
         titleLp.leftMargin = margin; titleLp.topMargin = host.dp(12); root.addView(title, titleLp);
 
-        addSystemControl(activity, root, "\u2630", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin, host.dp(8), host::showQuickMenu);
-        addSystemControl(activity, root, "\uD83D\uDCE5", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize + host.dp(6), host.dp(8), () -> host.showStateSlotDialog(false));
-        addSystemControl(activity, root, "\uD83D\uDCBE", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 2 + host.dp(12), host.dp(8), () -> host.showStateSlotDialog(true));
-        TextView speed = addSystemControl(activity, root, host.emulationSpeedLabel(), host.dp(44), menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 3 + host.dp(18), host.dp(8), host::cycleEmulationSpeed);
+        OverlayUiFactory.addSystemControl(activity, root, "\u2630", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin, host.dp(8), host::showQuickMenu);
+        OverlayUiFactory.addSystemControl(activity, root, "\uD83D\uDCE5", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize + host.dp(6), host.dp(8), () -> host.showStateSlotDialog(false));
+        OverlayUiFactory.addSystemControl(activity, root, "\uD83D\uDCBE", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 2 + host.dp(12), host.dp(8), () -> host.showStateSlotDialog(true));
+        TextView speed = OverlayUiFactory.addSystemControl(activity, root, host.emulationSpeedLabel(), host.dp(44), menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 3 + host.dp(18), host.dp(8), host::cycleEmulationSpeed);
         speed.setOnClickListener(v -> { host.cycleEmulationSpeed(); speed.setText(host.emulationSpeedLabel()); }); speed.setTextSize(12f);
 
         FrameLayout panel = new FrameLayout(activity);
@@ -109,7 +102,7 @@ final class GameControllerOverlay {
         List<View> controllerViews = new ArrayList<>(), cheatsViews = new ArrayList<>(), pokemonViews = new ArrayList<>(), settingsViews = new ArrayList<>(), navButtons = new ArrayList<>();
 
         float dpadX = sm.getButtonPosX(NativeBridge.BUTTON_UP, 0.255f), dpadY = sm.getButtonPosY(NativeBridge.BUTTON_UP, 0.52f);
-        sDpadView = makeDpadPad(activity, host, dpadSize); placeByCenter(panel, sDpadView, dpadSize, dpadSize, w * dpadX, h * dpadY); controllerViews.add(sDpadView);
+        sDpadView = makeDpadPad(activity, host, dpadSize); OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, w * dpadX, h * dpadY); controllerViews.add(sDpadView);
         controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_L, 0.62f), h * sm.getButtonPosY(NativeBridge.BUTTON_L, 0.30f), 10));
         controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_R, 0.86f), h * sm.getButtonPosY(NativeBridge.BUTTON_R, 0.30f), 10));
         controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "B", NativeBridge.BUTTON_B, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_B, 0.657f), h * sm.getButtonPosY(NativeBridge.BUTTON_B, 0.595f), actionSize / 2));
@@ -122,20 +115,20 @@ final class GameControllerOverlay {
             @Override public int dp(int value) { return host.dp(value); }
             @Override public CheatManager getCheatManager() { return host.getCheatManager(); }
             @Override public MemoryScanner getMemoryScanner() { return host.getMemoryScanner(); }
-        }); cheatsViews.add(cheatsView); placeByCenter(panel, cheatsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
+        }); cheatsViews.add(cheatsView); OverlayUiFactory.placeByCenter(panel, cheatsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
         View pokemonView = PokemonToolsViewBuilder.build(activity, new PokemonToolsViewBuilder.Host() {
             @Override public int dp(int value) { return host.dp(value); }
             @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
             @Override public PokemonManager getPokemonManager() { return host.getPokemonManager(); }
             @Override public MemoryScanner getMemoryScanner() { return host.getMemoryScanner(); }
         });
-        pokemonViews.add(pokemonView); placeByCenter(panel, pokemonView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
+        pokemonViews.add(pokemonView); OverlayUiFactory.placeByCenter(panel, pokemonView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
         View settingsView = SharedSettingsBuilder.buildSettingsView(activity, new SharedSettingsBuilder.Host() {
             @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
             @Override public void onSettingChanged() { activity.recreate(); }
             @Override public void onEditLayout() { startEditing(panel, controllerViews, cheatsViews, pokemonViews, settingsViews, navButtons, host); }
         });
-        settingsViews.add(settingsView); placeByCenter(panel, settingsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
+        settingsViews.add(settingsView); OverlayUiFactory.placeByCenter(panel, settingsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
 
         int navBtnW = w / 4;
         navButtons.add(addNavButton(panel, "CONTROLLER", "🎮", navBtnW, navHeight, w * 1f / 8f, h - navHeight / 2f, () -> switchPage(PAGE_CONTROLLER, controllerViews, cheatsViews, pokemonViews, settingsViews, navButtons, host)));
@@ -171,7 +164,7 @@ final class GameControllerOverlay {
         layout.setGravity(Gravity.CENTER);
         TextView iv = new TextView(parent.getContext()); iv.setText(icon); iv.setTextSize(20f); iv.setGravity(Gravity.CENTER); layout.addView(iv);
         TextView tv = new TextView(parent.getContext()); tv.setText(text); tv.setTextSize(10f); tv.setGravity(Gravity.CENTER); layout.addView(tv);
-        placeByCenter(parent, layout, width, height, centerX, centerY);
+        OverlayUiFactory.placeByCenter(parent, layout, width, height, centerX, centerY);
         layout.setOnClickListener(v -> action.run());
         return layout;
     }
@@ -194,11 +187,11 @@ final class GameControllerOverlay {
         for (VirtualButton b : sActionButtons) { b.view.setAlpha(1.0f); if (b.view.getBackground() instanceof GradientDrawable) ((GradientDrawable) b.view.getBackground()).setColor(0xAA444444); }
         LinearLayout o = new LinearLayout(p.getContext()); o.setOrientation(LinearLayout.HORIZONTAL); o.setGravity(Gravity.CENTER); o.setBackgroundColor(0xCC000000);
         int bw = host.dp(80), bh = host.dp(40);
-        o.addView(makeSystemButton((Activity)p.getContext(), "Save", () -> { saveLayout(p, host); stopEditing(p, cv, chv, pv, sv, nb, host); }), new LinearLayout.LayoutParams(bw, bh));
+        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Save", () -> { saveLayout(p, host); stopEditing(p, cv, chv, pv, sv, nb, host); }), new LinearLayout.LayoutParams(bw, bh));
         o.addView(new View(p.getContext()), new LinearLayout.LayoutParams(host.dp(12), 1));
-        o.addView(makeSystemButton((Activity)p.getContext(), "Reset", () -> { host.getSettingsManager().resetAllButtonPos(); ((Activity)p.getContext()).recreate(); }), new LinearLayout.LayoutParams(bw, bh));
+        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Reset", () -> { host.getSettingsManager().resetAllButtonPos(); ((Activity)p.getContext()).recreate(); }), new LinearLayout.LayoutParams(bw, bh));
         o.addView(new View(p.getContext()), new LinearLayout.LayoutParams(host.dp(12), 1));
-        o.addView(makeSystemButton((Activity)p.getContext(), "Cancel", () -> stopEditing(p, cv, chv, pv, sv, nb, host)), new LinearLayout.LayoutParams(bw, bh));
+        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Cancel", () -> stopEditing(p, cv, chv, pv, sv, nb, host)), new LinearLayout.LayoutParams(bw, bh));
         p.addView(o, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(60), Gravity.BOTTOM)); sEditControlsOverlay = o;
     }
 
@@ -221,7 +214,7 @@ final class GameControllerOverlay {
     }
 
     private static void addDpadArrow(Activity a, FrameLayout p, String l, int s, float cx, float cy) {
-        TextView ar = new TextView(a); ar.setText(l); ar.setTextSize(20f); ar.setTextColor(Color.WHITE); ar.setGravity(Gravity.CENTER); placeByCenter(p, ar, s, s, cx, cy);
+        TextView ar = new TextView(a); ar.setText(l); ar.setTextSize(20f); ar.setTextColor(Color.WHITE); ar.setGravity(Gravity.CENTER); OverlayUiFactory.placeByCenter(p, ar, s, s, cx, cy);
     }
 
     private static void updateDpad(View d, DpadState s, MotionEvent e) {
@@ -260,33 +253,12 @@ final class GameControllerOverlay {
     }
 
     private static TextView addActionButton(Activity a, FrameLayout p, List<VirtualButton> bs, String l, int b, int w, int h, float cx, float cy, int r) {
-        TextView v = makeButton(a, l, r); placeByCenter(p, v, w, h, cx, cy); bs.add(new VirtualButton(v, b)); return v;
-    }
-
-    private static TextView addSystemControl(Activity a, FrameLayout p, String l, int w, int h, int g, int hm, int vm, Runnable ac) {
-        TextView v = makeSystemButton(a, l, ac); FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h, g);
-        if ((g & Gravity.RIGHT) == Gravity.RIGHT) lp.rightMargin = hm; else if ((g & Gravity.LEFT) == Gravity.LEFT) lp.leftMargin = hm;
-        if ((g & Gravity.TOP) == Gravity.TOP) lp.topMargin = vm; else lp.bottomMargin = vm; p.addView(v, lp); return v;
-    }
-
-    private static void placeByCenter(ViewGroup p, View v, int w, int h, float cx, float cy) {
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h, Gravity.TOP | Gravity.LEFT);
-        lp.leftMargin = Math.round(cx - w / 2f); lp.topMargin = Math.round(cy - h / 2f); p.addView(v, lp);
-    }
-
-    private static TextView makeSystemButton(Activity a, String l, Runnable ac) {
-        TextView v = new TextView(a); v.setText(l); v.setTextSize(14f); v.setTextColor(Color.WHITE); v.setGravity(Gravity.CENTER);
-        GradientDrawable g = new GradientDrawable(); g.setColor(0xAA333333); g.setCornerRadius(12); v.setBackground(g); v.setAlpha(0.9f); v.setOnClickListener(view -> ac.run()); return v;
+        TextView v = makeButton(a, l, r); OverlayUiFactory.placeByCenter(p, v, w, h, cx, cy); bs.add(new VirtualButton(v, b)); return v;
     }
 
     private static TextView makeButton(Activity a, String l, int r) {
         TextView v = new TextView(a); v.setText(l); float ts = l.length() > 5 ? 10f : (l.length() > 1 ? 12f : 24f); v.setTextSize(ts); v.setTextColor(Color.WHITE); v.setGravity(Gravity.CENTER);
         GradientDrawable g = new GradientDrawable(); if (sUseSkin) { g.setColor(Color.WHITE); v.setAlpha(0.0f); } else { g.setColor(0xAA444444); v.setAlpha(0.85f); }
         g.setCornerRadius(r); v.setBackground(g); return v;
-    }
-
-    private static String bytesToHex(byte[] b) {
-        if (b == null) return "NULL"; StringBuilder s = new StringBuilder();
-        for (byte x : b) s.append(String.format("%02X ", x)); return s.toString();
     }
 }
