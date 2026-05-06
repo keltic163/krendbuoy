@@ -339,6 +339,17 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridg
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_getFrameWidth(JNIEnv*, jclass) { std::lock_guard<std::mutex> lock(frameMutex); return frameWidth; }
 extern "C" JNIEXPORT jint JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_getFrameHeight(JNIEnv*, jclass) { std::lock_guard<std::mutex> lock(frameMutex); return frameHeight; }
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_copyFramePixelsTo(JNIEnv* env, jclass, jintArray out) {
+    if (!out) return JNI_FALSE;
+    std::lock_guard<std::mutex> lock(frameMutex);
+    if (framePixels.empty()) return JNI_FALSE;
+    jsize capacity = env->GetArrayLength(out);
+    if (capacity < static_cast<jsize>(framePixels.size())) return JNI_FALSE;
+    env->SetIntArrayRegion(out, 0, static_cast<jsize>(framePixels.size()), reinterpret_cast<const jint*>(framePixels.data()));
+    return JNI_TRUE;
+}
+
 extern "C" JNIEXPORT jintArray JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_copyFramePixels(JNIEnv* env, jclass) {
     std::lock_guard<std::mutex> lock(frameMutex);
     if (framePixels.empty()) return env->NewIntArray(0);

@@ -62,6 +62,15 @@ final class RomSessionManager {
     }
 
     private File copyRomToLocalFile(Uri uri, String displayName) throws Exception {
+        // Clean up previous cached ROMs
+        File cacheDir = activity.getCacheDir();
+        File[] oldRoms = cacheDir.listFiles((dir, name) -> name.startsWith("selected-rom-"));
+        if (oldRoms != null) {
+            for (File oldRom : oldRoms) {
+                oldRom.delete();
+            }
+        }
+
         String extension = getKnownRomExtension(displayName);
         File target = new File(activity.getCacheDir(), "selected-rom-" + System.currentTimeMillis() + extension);
         try (InputStream input = activity.getContentResolver().openInputStream(uri); FileOutputStream output = new FileOutputStream(target)) {

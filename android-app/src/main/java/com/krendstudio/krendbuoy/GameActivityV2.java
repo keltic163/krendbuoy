@@ -159,6 +159,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         exportPortableSramIfEnabled();
         stopAudioPlayback();
         releaseAllButtons();
+        GameControllerOverlay.cleanup();
+        ControllerLayoutEditor.reset();
         NativeBridge.unloadRom();
         super.onDestroy();
     }

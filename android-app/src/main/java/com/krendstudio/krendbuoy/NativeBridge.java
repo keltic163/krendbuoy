@@ -32,6 +32,8 @@ public final class NativeBridge {
 
     public static native int getFrameHeight();
 
+    public static native boolean copyFramePixelsTo(int[] out);
+
     public static native int[] copyFramePixels();
 
     public static native void setButtonState(int button, boolean pressed);

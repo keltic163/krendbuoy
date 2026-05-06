@@ -41,6 +41,11 @@ final class GameControllerOverlay {
     private static View sDpadView;
     private static final List<VirtualButton> sActionButtons = new ArrayList<>();
 
+    static void cleanup() {
+        sDpadView = null;
+        sActionButtons.clear();
+    }
+
     private static final class VirtualButton implements ControllerLayoutEditor.ButtonBinding {
         final View view;
         final int button;

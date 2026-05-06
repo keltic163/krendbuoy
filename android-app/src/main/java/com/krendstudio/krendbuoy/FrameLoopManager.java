@@ -19,6 +19,8 @@ final class FrameLoopManager {
     private Thread frameThread;
     private final Object bitmapLock = new Object();
     private Bitmap lastBitmap;
+    private int[] pixelBuffer;
+    private Bitmap reusableBitmap;
 
     FrameLoopManager(Host host, ImageView screen) {
         this.host = host;
@@ -43,7 +45,6 @@ final class FrameLoopManager {
                 boolean ok = true;
                 int width = 0;
                 int height = 0;
-                int[] pixels = null;
 
                 for (int i = 0; i < speed && running; i++) {
                     if (!NativeBridge.runFrame()) {
@@ -55,17 +56,29 @@ final class FrameLoopManager {
 
                     width = NativeBridge.getFrameWidth();
                     height = NativeBridge.getFrameHeight();
-                    pixels = NativeBridge.copyFramePixels();
+                    
+                    if (width > 0 && height > 0) {
+                        int size = width * height;
+                        if (pixelBuffer == null || pixelBuffer.length != size) {
+                            pixelBuffer = new int[size];
+                        }
+                        NativeBridge.copyFramePixelsTo(pixelBuffer);
+                    }
                     frame++;
                 }
 
                 if (ok) {
-                    if (width > 0 && height > 0 && pixels != null && pixels.length == width * height) {
-                        Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
-                        synchronized (bitmapLock) {
-                            lastBitmap = bitmap;
+                    if (width > 0 && height > 0 && pixelBuffer != null) {
+                        if (reusableBitmap == null || reusableBitmap.getWidth() != width || reusableBitmap.getHeight() != height) {
+                            reusableBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                         }
-                        host.runOnUiThread(() -> screen.setImageBitmap(bitmap));
+                        reusableBitmap.setPixels(pixelBuffer, 0, width, 0, 0, width, height);
+                        
+                        Bitmap displayBitmap = reusableBitmap;
+                        synchronized (bitmapLock) {
+                            lastBitmap = displayBitmap;
+                        }
+                        host.runOnUiThread(() -> screen.setImageBitmap(displayBitmap));
                     }
                     if (frame % 30 == 0) {
                         host.updateFrameInfo("audio preset " + host.audioPresetLabelForFrameLoop() + "\n" + NativeBridge.getLastError());
