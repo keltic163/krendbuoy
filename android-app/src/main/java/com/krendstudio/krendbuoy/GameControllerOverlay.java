@@ -37,17 +37,17 @@ final class GameControllerOverlay {
     private static final int PAGE_POKEMON = 2;
     private static final int PAGE_SETTINGS = 3;
     private static int sCurrentPage = PAGE_CONTROLLER;
-    private static boolean sIsEditing = false;
     private static boolean sUseSkin = true;
     private static View sDpadView;
     private static final List<VirtualButton> sActionButtons = new ArrayList<>();
-    private static View sEditControlsOverlay;
 
-    private static final class VirtualButton {
+    private static final class VirtualButton implements ControllerLayoutEditor.ButtonBinding {
         final View view;
         final int button;
         boolean pressed;
         VirtualButton(View view, int button) { this.view = view; this.button = button; }
+        @Override public View getView() { return view; }
+        @Override public int getButton() { return button; }
     }
 
     private static final class DpadState { boolean up, down, left, right; }
@@ -56,7 +56,7 @@ final class GameControllerOverlay {
 
     static void attach(Activity activity, FrameLayout root, Host host) {
         sCurrentPage = PAGE_CONTROLLER;
-        sIsEditing = false;
+        ControllerLayoutEditor.reset();
         sUseSkin = host.getSettingsManager().isControllerSkinEnabled();
         int menuIconSize = host.dp(40);
         int margin = host.dp(16);
@@ -138,7 +138,10 @@ final class GameControllerOverlay {
         switchPage(PAGE_CONTROLLER, controllerViews, cheatsViews, pokemonViews, settingsViews, navButtons, host);
 
         panel.setOnTouchListener((view, event) -> {
-            if (sIsEditing) { handleEditTouch(event); return true; }
+            if (ControllerLayoutEditor.isEditing()) {
+                ControllerLayoutEditor.handleTouch(event, sDpadView, sActionButtons);
+                return true;
+            }
             if (sCurrentPage == PAGE_CONTROLLER) { updateDpad(sDpadView, dpadState, event); updateVirtualButtons(actionButtons, event); }
             return true;
         });
@@ -158,6 +161,21 @@ final class GameControllerOverlay {
         }
     }
 
+    private static void startEditing(FrameLayout panel, List<View> controllerViews, List<View> cheatsViews, List<View> pokemonViews, List<View> settingsViews, List<View> navButtons, Host host) {
+        ControllerLayoutEditor.start(
+                panel,
+                sDpadView,
+                sActionButtons,
+                sUseSkin,
+                new ControllerLayoutEditor.Host() {
+                    @Override public int dp(int value) { return host.dp(value); }
+                    @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
+                },
+                () -> switchPage(PAGE_CONTROLLER, controllerViews, cheatsViews, pokemonViews, settingsViews, navButtons, host),
+                () -> switchPage(PAGE_SETTINGS, controllerViews, cheatsViews, pokemonViews, settingsViews, navButtons, host)
+        );
+    }
+
     private static View addNavButton(ViewGroup parent, String text, String icon, int width, int height, float centerX, float centerY, Runnable action) {
         LinearLayout layout = new LinearLayout(parent.getContext());
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -168,44 +186,7 @@ final class GameControllerOverlay {
         layout.setOnClickListener(v -> action.run());
         return layout;
     }
-    private static void handleEditTouch(MotionEvent event) {
-        int action = event.getActionMasked(); float x = event.getX(), y = event.getY();
-        if (action == MotionEvent.ACTION_DOWN) {
-            sDraggingView = null; if (isInside(x, y, sDpadView)) sDraggingView = sDpadView; else for (VirtualButton b : sActionButtons) if (isInside(x, y, b.view)) { sDraggingView = b.view; break; }
-            if (sDraggingView != null) { sDragOffsetX = x - (sDraggingView.getLeft() + sDraggingView.getWidth() / 2f); sDragOffsetY = y - (sDraggingView.getTop() + sDraggingView.getHeight() / 2f); sDraggingView.setAlpha(0.5f); }
-        } else if (action == MotionEvent.ACTION_MOVE && sDraggingView != null) {
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sDraggingView.getLayoutParams();
-            lp.leftMargin = Math.round(x - sDragOffsetX - sDraggingView.getWidth() / 2f); lp.topMargin = Math.round(y - sDragOffsetY - sDraggingView.getHeight() / 2f); sDraggingView.setLayoutParams(lp);
-        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) { if (sDraggingView != null) { sDraggingView.setAlpha(1.0f); sDraggingView = null; } }
-    }
 
-    private static View sDraggingView = null;
-    private static float sDragOffsetX = 0, sDragOffsetY = 0;
-
-    private static void startEditing(FrameLayout p, List<View> cv, List<View> chv, List<View> pv, List<View> sv, List<View> nb, Host host) {
-        sIsEditing = true; switchPage(PAGE_CONTROLLER, cv, chv, pv, sv, nb, host); sDpadView.setBackgroundColor(0x66888888);
-        for (VirtualButton b : sActionButtons) { b.view.setAlpha(1.0f); if (b.view.getBackground() instanceof GradientDrawable) ((GradientDrawable) b.view.getBackground()).setColor(0xAA444444); }
-        LinearLayout o = new LinearLayout(p.getContext()); o.setOrientation(LinearLayout.HORIZONTAL); o.setGravity(Gravity.CENTER); o.setBackgroundColor(0xCC000000);
-        int bw = host.dp(80), bh = host.dp(40);
-        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Save", () -> { saveLayout(p, host); stopEditing(p, cv, chv, pv, sv, nb, host); }), new LinearLayout.LayoutParams(bw, bh));
-        o.addView(new View(p.getContext()), new LinearLayout.LayoutParams(host.dp(12), 1));
-        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Reset", () -> { host.getSettingsManager().resetAllButtonPos(); ((Activity)p.getContext()).recreate(); }), new LinearLayout.LayoutParams(bw, bh));
-        o.addView(new View(p.getContext()), new LinearLayout.LayoutParams(host.dp(12), 1));
-        o.addView(OverlayUiFactory.makeSystemButton((Activity)p.getContext(), "Cancel", () -> stopEditing(p, cv, chv, pv, sv, nb, host)), new LinearLayout.LayoutParams(bw, bh));
-        p.addView(o, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(60), Gravity.BOTTOM)); sEditControlsOverlay = o;
-    }
-
-    private static void stopEditing(FrameLayout p, List<View> cv, List<View> chv, List<View> pv, List<View> sv, List<View> nb, Host host) {
-        sIsEditing = false; if (sEditControlsOverlay != null) { p.removeView(sEditControlsOverlay); sEditControlsOverlay = null; }
-        if (sUseSkin) { sDpadView.setBackgroundColor(Color.TRANSPARENT); for (VirtualButton b : sActionButtons) { b.view.setAlpha(0.0f); if (b.view.getBackground() instanceof GradientDrawable) ((GradientDrawable) b.view.getBackground()).setColor(Color.WHITE); } }
-        switchPage(PAGE_SETTINGS, cv, chv, pv, sv, nb, host);
-    }
-
-    private static void saveLayout(FrameLayout p, Host host) {
-        float w = p.getWidth(), h = p.getHeight(); if (w <= 0 || h <= 0) return; AppSettingsManager sm = host.getSettingsManager();
-        sm.setButtonPos(NativeBridge.BUTTON_UP, (sDpadView.getLeft() + sDpadView.getWidth() / 2f) / w, (sDpadView.getTop() + sDpadView.getHeight() / 2f) / h);
-        for (VirtualButton b : sActionButtons) sm.setButtonPos(b.button, (b.view.getLeft() + b.view.getWidth() / 2f) / w, (b.view.getTop() + b.view.getHeight() / 2f) / h);
-    }
     private static FrameLayout makeDpadPad(Activity a, Host h, int s) {
         FrameLayout p = new FrameLayout(a); if (sUseSkin) p.setBackgroundColor(Color.TRANSPARENT); else { GradientDrawable g = new GradientDrawable(); g.setColor(0x66333333); g.setCornerRadius(s / 2f); p.setBackground(g); }
         p.setAlpha(1.0f); int as = Math.max(h.dp(42), Math.round(s * 0.32f)), o = Math.round(s * 0.32f);
