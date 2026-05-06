@@ -118,7 +118,11 @@ final class GameControllerOverlay {
         controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_START, 0.585f), h * sm.getButtonPosY(NativeBridge.BUTTON_START, 0.77f), 10));
         sActionButtons.addAll(actionButtons);
 
-        View cheatsView = buildCheatsView(activity, host); cheatsViews.add(cheatsView); placeByCenter(panel, cheatsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
+        View cheatsView = CheatsToolsViewBuilder.build(activity, new CheatsToolsViewBuilder.Host() {
+            @Override public int dp(int value) { return host.dp(value); }
+            @Override public CheatManager getCheatManager() { return host.getCheatManager(); }
+            @Override public MemoryScanner getMemoryScanner() { return host.getMemoryScanner(); }
+        }); cheatsViews.add(cheatsView); placeByCenter(panel, cheatsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
         View pokemonView = PokemonToolsViewBuilder.build(activity, new PokemonToolsViewBuilder.Host() {
             @Override public int dp(int value) { return host.dp(value); }
             @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
@@ -171,67 +175,6 @@ final class GameControllerOverlay {
         layout.setOnClickListener(v -> action.run());
         return layout;
     }
-
-    private static View buildCheatsView(Activity activity, Host host) {
-        FrameLayout wrapper = new FrameLayout(activity);
-        final Runnable[] refreshRef = new Runnable[1];
-        refreshRef[0] = () -> {
-            wrapper.removeAllViews(); LinearLayout root = new LinearLayout(activity); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(host.dp(16), host.dp(16), host.dp(16), host.dp(16));
-            buildCheatsContent(activity, host, root, refreshRef[0]); wrapper.addView(root);
-        };
-        refreshRef[0].run(); return wrapper;
-    }
-    private static void buildCheatsContent(Activity activity, Host host, LinearLayout root, Runnable refreshAll) {
-        MemoryScanner ms = host.getMemoryScanner();
-        TextView scanTitle = new TextView(activity); scanTitle.setText("Memory Scanner (Cheat Engine)"); scanTitle.setTextColor(Color.CYAN); scanTitle.setTypeface(null, Typeface.BOLD); scanTitle.setTextSize(14f); root.addView(scanTitle);
-        LinearLayout scanRow = new LinearLayout(activity); scanRow.setOrientation(LinearLayout.HORIZONTAL); scanRow.setPadding(0, host.dp(8), 0, host.dp(8));
-        scanRow.addView(makeSystemButton(activity, "New Scan", () -> showValueInputDialog(activity, "First Scan", val -> { int count = ms.firstScan(val); Toast.makeText(activity, "Found " + count, Toast.LENGTH_SHORT).show(); refreshAll.run(); })), new LinearLayout.LayoutParams(0, host.dp(34), 1f));
-        scanRow.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(8), 1));
-        scanRow.addView(makeSystemButton(activity, "Next Scan", () -> showValueInputDialog(activity, "Next Scan", val -> { int count = ms.nextScan(val); Toast.makeText(activity, "Filtered to " + count, Toast.LENGTH_SHORT).show(); refreshAll.run(); })), new LinearLayout.LayoutParams(0, host.dp(34), 1f));
-        root.addView(scanRow);
-        List<Integer> res = ms.getResults();
-        if (!res.isEmpty()) {
-            TextView rh = new TextView(activity); rh.setText("Results (" + res.size() + "): Click to Copy"); rh.setTextColor(Color.YELLOW); rh.setTextSize(11f); root.addView(rh);
-            LinearLayout rl = new LinearLayout(activity); rl.setOrientation(LinearLayout.VERTICAL);
-            for (int i = 0; i < Math.min(res.size(), 5); i++) {
-                final int addr = res.get(i); TextView ri = new TextView(activity); ri.setText(String.format("0x%08X", addr)); ri.setTextColor(Color.GREEN); ri.setPadding(host.dp(8), host.dp(4), host.dp(8), host.dp(4));
-                ri.setOnClickListener(v -> {
-                    android.content.ClipboardManager cb = (android.content.ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    cb.setPrimaryClip(android.content.ClipData.newPlainText("Address", String.format("0x%08X", addr)));
-                    Toast.makeText(activity, "Copied: 0x" + Integer.toHexString(addr), Toast.LENGTH_SHORT).show();
-                }); rl.addView(ri);
-            }
-            root.addView(rl);
-        }
-        root.addView(new View(activity), new LinearLayout.LayoutParams(1, host.dp(12)));
-        TextView t = new TextView(activity); t.setText("Standard Cheats"); t.setTextColor(Color.WHITE); t.setTypeface(null, Typeface.BOLD); t.setTextSize(14f); t.setPadding(0, host.dp(12), 0, host.dp(8)); root.addView(t);
-        ScrollView s = new ScrollView(activity); LinearLayout l = new LinearLayout(activity); l.setOrientation(LinearLayout.VERTICAL); s.addView(l); root.addView(s, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        final Runnable rlr[] = new Runnable[1];
-        Runnable rl = () -> {
-            l.removeAllViews(); CheatManager cm = host.getCheatManager(); if (cm == null) return; List<CheatEntry> chs = cm.getCheats();
-            if (chs.isEmpty()) { TextView e = new TextView(activity); e.setText("No cheats yet."); e.setTextColor(Color.GRAY); e.setGravity(Gravity.CENTER); l.addView(e); }
-            else for (int i = 0; i < chs.size(); i++) {
-                final int idx = i; CheatEntry en = chs.get(idx);
-                LinearLayout row = new LinearLayout(activity); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(0, host.dp(8), 0, host.dp(8));
-                android.widget.CheckBox cb = new android.widget.CheckBox(activity); cb.setChecked(en.enabled); cb.setOnCheckedChangeListener((v, c) -> cm.toggleCheat(idx)); row.addView(cb);
-                LinearLayout tc = new LinearLayout(activity); tc.setOrientation(LinearLayout.VERTICAL);
-                TextView n = new TextView(activity); n.setText(en.name); n.setTextColor(Color.WHITE); tc.addView(n);
-                TextView c = new TextView(activity); c.setText(en.code); c.setTextColor(Color.LTGRAY); c.setTextSize(11f); tc.addView(c);
-                row.addView(tc, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-                tc.setOnClickListener(v -> showEditCheatDialog(activity, host, idx, en, rlr[0]));
-                TextView del = new TextView(activity); del.setText("\u2715"); del.setTextColor(Color.RED); del.setPadding(host.dp(12), 0, host.dp(12), 0);
-                del.setOnClickListener(v -> { cm.removeCheat(idx); rlr[0].run(); }); row.addView(del); l.addView(row);
-            }
-        };
-        rlr[0] = rl; rl.run();
-        TextView ab = makeSystemButton(activity, "Add New Cheat", () -> showAddCheatDialog(activity, host, rl)); root.addView(ab, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(44)));
-    }
-
-    private interface ValueCallback { void onValue(int val); }
-    private static void showValueInputDialog(Activity a, String title, ValueCallback cb) {
-        android.widget.EditText in = new android.widget.EditText(a); in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        new AlertDialog.Builder(a).setTitle(title).setView(in).setPositiveButton("OK", (d, w) -> { try { cb.onValue(Integer.parseInt(in.getText().toString())); } catch (Exception ignored) {} }).setNegativeButton("Cancel", null).show();
-    }
     private static void handleEditTouch(MotionEvent event) {
         int action = event.getActionMasked(); float x = event.getX(), y = event.getY();
         if (action == MotionEvent.ACTION_DOWN) {
@@ -270,19 +213,6 @@ final class GameControllerOverlay {
         sm.setButtonPos(NativeBridge.BUTTON_UP, (sDpadView.getLeft() + sDpadView.getWidth() / 2f) / w, (sDpadView.getTop() + sDpadView.getHeight() / 2f) / h);
         for (VirtualButton b : sActionButtons) sm.setButtonPos(b.button, (b.view.getLeft() + b.view.getWidth() / 2f) / w, (b.view.getTop() + b.view.getHeight() / 2f) / h);
     }
-
-    private static void showAddCheatDialog(Activity a, Host h, Runnable o) { showCheatEditorDialog(a, h, -1, null, o); }
-    private static void showEditCheatDialog(Activity a, Host h, int i, CheatEntry e, Runnable o) { showCheatEditorDialog(a, h, i, e, o); }
-    private static void showCheatEditorDialog(Activity a, Host h, int idx, CheatEntry e, Runnable o) {
-        boolean isE = (e != null); LinearLayout l = new LinearLayout(a); l.setOrientation(LinearLayout.VERTICAL); l.setPadding(h.dp(20), h.dp(20), h.dp(20), h.dp(20));
-        android.widget.EditText ni = new android.widget.EditText(a); ni.setHint("Name"); if (isE) ni.setText(e.name); l.addView(ni);
-        android.widget.EditText ci = new android.widget.EditText(a); ci.setHint("Code"); if (isE) ci.setText(e.code); l.addView(ci);
-        new AlertDialog.Builder(a).setTitle(isE ? "Edit Cheat" : "Add Cheat").setView(l).setPositiveButton(isE ? "Save" : "Add", (d, w) -> {
-            String n = ni.getText().toString().trim(), c = ci.getText().toString().trim();
-            if (!c.isEmpty()) { if (n.isEmpty()) n = "Unnamed"; if (isE) h.getCheatManager().updateCheat(idx, n, c); else h.getCheatManager().addCheat(n, c); o.run(); }
-        }).setNegativeButton("Cancel", null).show();
-    }
-
     private static FrameLayout makeDpadPad(Activity a, Host h, int s) {
         FrameLayout p = new FrameLayout(a); if (sUseSkin) p.setBackgroundColor(Color.TRANSPARENT); else { GradientDrawable g = new GradientDrawable(); g.setColor(0x66333333); g.setCornerRadius(s / 2f); p.setBackground(g); }
         p.setAlpha(1.0f); int as = Math.max(h.dp(42), Math.round(s * 0.32f)), o = Math.round(s * 0.32f);
