@@ -119,7 +119,13 @@ final class GameControllerOverlay {
         sActionButtons.addAll(actionButtons);
 
         View cheatsView = buildCheatsView(activity, host); cheatsViews.add(cheatsView); placeByCenter(panel, cheatsView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
-        View pokemonView = buildPokemonView(activity, host); pokemonViews.add(pokemonView); placeByCenter(panel, pokemonView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
+        View pokemonView = PokemonToolsViewBuilder.build(activity, new PokemonToolsViewBuilder.Host() {
+            @Override public int dp(int value) { return host.dp(value); }
+            @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
+            @Override public PokemonManager getPokemonManager() { return host.getPokemonManager(); }
+            @Override public MemoryScanner getMemoryScanner() { return host.getMemoryScanner(); }
+        });
+        pokemonViews.add(pokemonView); placeByCenter(panel, pokemonView, w, h - navHeight, w / 2f, (h - navHeight) / 2f);
         View settingsView = SharedSettingsBuilder.buildSettingsView(activity, new SharedSettingsBuilder.Host() {
             @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
             @Override public void onSettingChanged() { activity.recreate(); }
