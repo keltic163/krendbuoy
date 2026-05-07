@@ -1,5 +1,3 @@
-/*test
-*/
 package com.krendstudio.krendbuoy;
 
 import android.content.Context;
