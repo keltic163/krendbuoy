@@ -18,6 +18,8 @@ final class AppSettingsManager {
 
     static final int THEME_DEFAULT = 0;
     static final int LANGUAGE_SYSTEM = 0;
+    static final int LANGUAGE_EN = 1;
+    static final int LANGUAGE_ZH_TW = 2;
 
     private static final String KEY_AUDIO_PRESET = "audio_preset";
     private static final String KEY_DISPLAY_MODE = "display_mode";
@@ -100,11 +102,11 @@ final class AppSettingsManager {
     }
 
     int getLanguageMode() {
-        return prefs.getInt(KEY_LANGUAGE, LANGUAGE_SYSTEM);
+        return normalizeLanguageMode(prefs.getInt(KEY_LANGUAGE, LANGUAGE_SYSTEM));
     }
 
     void setLanguageMode(int value) {
-        prefs.edit().putInt(KEY_LANGUAGE, value).apply();
+        prefs.edit().putInt(KEY_LANGUAGE, normalizeLanguageMode(value)).apply();
     }
 
     int getControllerLayout() {
@@ -181,6 +183,10 @@ final class AppSettingsManager {
         return value == AUDIO_1024 || value == AUDIO_2048 || value == AUDIO_4096 ? value : AUDIO_DYNAMIC;
     }
 
+    static int normalizeLanguageMode(int value) {
+        return value == LANGUAGE_EN || value == LANGUAGE_ZH_TW ? value : LANGUAGE_SYSTEM;
+    }
+
     static String audioPresetLabel(int value) {
         value = normalizeAudioPreset(value);
         if (value == AUDIO_1024) return "1024";
@@ -201,6 +207,9 @@ final class AppSettingsManager {
     }
 
     static String languageLabel(int value) {
+        value = normalizeLanguageMode(value);
+        if (value == LANGUAGE_EN) return "English";
+        if (value == LANGUAGE_ZH_TW) return "Traditional Chinese (Taiwan)";
         return "System Default";
     }
 
