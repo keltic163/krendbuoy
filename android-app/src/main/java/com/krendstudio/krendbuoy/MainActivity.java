@@ -93,8 +93,9 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         coreLoaded = false;
         try {
             System.loadLibrary("vbam_libretro");
+            System.loadLibrary("vbam_frontend");
             coreLoaded = true;
-            coreStatus = "Core loaded successfully";
+            coreStatus = "Core libraries loaded successfully";
         } catch (Throwable t) {
             coreStatus = "Core library load failed: " + t.getMessage();
         }
