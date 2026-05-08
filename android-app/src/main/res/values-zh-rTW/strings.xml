@@ -2,13 +2,22 @@
 <resources>
     <string name="app_name">KrendBuoy</string>
 
+    <string name="common_ok">確定</string>
+    <string name="common_on">開啟</string>
+    <string name="common_off">關閉</string>
+    <string name="common_default">預設</string>
+
     <string name="settings_language">語言</string>
     <string name="language_system">跟隨系統</string>
     <string name="language_en">英文</string>
     <string name="language_zh_tw">繁體中文（台灣）</string>
     <string name="language_restart_note">變更語言後，部分畫面會重新整理。</string>
+    <string name="language_game_apply_later">語言會在返回主畫面或重新進入遊戲後套用。</string>
 
+    <string name="settings_title">設定</string>
     <string name="settings_display">顯示</string>
+    <string name="settings_display_settings">顯示設定</string>
+    <string name="settings_controller_settings">控制器設定</string>
     <string name="settings_screen_scaling">畫面縮放</string>
     <string name="display_fit_screen">符合螢幕</string>
     <string name="display_original_ratio">原始比例</string>
@@ -25,18 +34,46 @@
 
     <string name="settings_controller">控制器</string>
     <string name="settings_use_controller_skin">使用控制器外觀</string>
+    <string name="settings_controller_skin_format">控制器外觀：%1$s</string>
     <string name="settings_select_skin_style">選擇外觀樣式</string>
+    <string name="settings_select_skin_format">選擇外觀：樣式 %1$02d</string>
     <string name="skin_style_01">樣式 01（原始）</string>
     <string name="skin_style_02">樣式 02</string>
     <string name="skin_style_03">樣式 03</string>
+    <string name="settings_button_size_default">按鍵大小：預設</string>
+    <string name="settings_button_opacity_default">按鍵透明度：預設</string>
+    <string name="settings_controller_pending">控制器自訂功能會在後續版本加入。</string>
     <string name="settings_layout">布局</string>
     <string name="settings_edit_controller_layout">編輯控制器布局</string>
 
     <string name="settings_audio_preset">音訊預設</string>
     <string name="audio_dynamic">動態調整－建議</string>
-    <string name="audio_1024">1024－超低延遲，可能爆音</string>
+    <string name="audio_1024">1024－超低延遲</string>
+    <string name="audio_1024_may_crackle">1024－超低延遲，可能爆音</string>
     <string name="audio_2048">2048－低延遲</string>
     <string name="audio_4096">4096－平衡</string>
+
+    <string name="quick_menu_title">KrendBuoy 選單</string>
+    <string name="quick_menu_resume">繼續遊戲</string>
+    <string name="quick_menu_restart_game">重新啟動遊戲</string>
+    <string name="quick_menu_return_main_menu">返回主選單</string>
+
+    <string name="save_state_title">儲存狀態</string>
+    <string name="load_state_title">讀取狀態</string>
+    <string name="load_state_with_rom_format">讀取狀態 - %1$s</string>
+    <string name="overwrite_save_state_title">覆蓋儲存狀態</string>
+    <string name="overwrite_save_state_message_format">Slot %1$d 已有儲存狀態。\n%2$s\n\n要覆蓋嗎？</string>
+    <string name="overwrite">覆蓋</string>
+    <string name="slot_empty_format">Slot %1$d 是空的</string>
+    <string name="save_state_saved_format">已儲存 Slot %1$d</string>
+    <string name="save_state_write_failed">儲存狀態寫入失敗</string>
+    <string name="save_state_failed_format">儲存狀態失敗：%1$s</string>
+    <string name="load_state_loaded_format">已讀取 Slot %1$d</string>
+    <string name="load_state_failed">讀取狀態失敗</string>
+    <string name="load_state_failed_format">讀取狀態失敗：%1$s</string>
+    <string name="no_save_state_in_slot_format">Slot %1$d 沒有儲存狀態。</string>
+    <string name="auto_save_loading">自動儲存（讀取中...）</string>
+    <string name="slot_loading_format">Slot %1$d（讀取中...）</string>
 
     <string name="tab_games">遊戲</string>
     <string name="tab_settings">設定</string>
