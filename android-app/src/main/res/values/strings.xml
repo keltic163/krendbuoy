@@ -6,6 +6,11 @@
     <string name="common_on">ON</string>
     <string name="common_off">OFF</string>
     <string name="common_default">Default</string>
+    <string name="common_yes">YES</string>
+    <string name="common_no">NO</string>
+    <string name="common_found">FOUND</string>
+    <string name="common_missing">MISSING</string>
+    <string name="common_never">Never</string>
 
     <string name="settings_language">Language</string>
     <string name="language_system">System Default</string>
@@ -82,4 +87,30 @@
     <string name="no_folder_selected">No folder selected</string>
     <string name="choose_save_rom_folder">Choose a Save / ROM folder first. ROM files must be inside that folder.</string>
     <string name="no_rom_files_found">No .gba, .gbc, or .gb files found in this folder.</string>
+    <string name="sort_rom_list">Sort ROM List</string>
+    <string name="sort_last_played">Last Played</string>
+    <string name="sort_name_asc">Name A → Z</string>
+    <string name="sort_name_desc">Name Z → A</string>
+    <string name="sort_state_count">Save State Count</string>
+    <string name="sort_recently_added">Recently Added</string>
+    <string name="rom_action_launch_game">Launch Game</string>
+    <string name="rom_action_load_state_slot">Load State Slot</string>
+    <string name="rom_action_pin_favorite">Pin Favorite</string>
+    <string name="rom_action_unpin_favorite">Unpin Favorite</string>
+    <string name="rom_action_show_file_info">Show File Info</string>
+    <string name="rom_action_refresh_status">Refresh Status</string>
+    <string name="file_info_title">File Info</string>
+    <string name="load_state_notice_title">Load State</string>
+    <string name="rom_list_failed_title">ROM List Failed</string>
+    <string name="rom_list_failed_default">Could not list selected folder.</string>
+    <string name="core_unavailable_title">Core Unavailable</string>
+    <string name="folder_required_title">Folder Required</string>
+    <string name="folder_required_message">Choose a Save / ROM folder before starting a game.</string>
+    <string name="sav_found">SAV FOUND</string>
+    <string name="no_sav">NO SAV</string>
+    <string name="state_count_format">STATE x%1$d</string>
+    <string name="no_state">NO STATE</string>
+    <string name="pinned">PINNED</string>
+    <string name="last_played_format">Last played: %1$s</string>
+    <string name="file_info_format">%1$s\n\nFavorite: %2$s\nSAV: %3$s\nSTATE: %4$d\nLast played: %5$s\nFolder: %6$s</string>
 </resources>
