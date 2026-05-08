@@ -8,4 +8,10 @@ public class KrendBuoyApplication extends Application {
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(LocaleHelper.wrap(base));
     }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        LocaleHelper.applyTo(this);
+    }
 }
