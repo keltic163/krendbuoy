@@ -2,13 +2,22 @@
 <resources>
     <string name="app_name">KrendBuoy</string>
 
+    <string name="common_ok">OK</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
+    <string name="common_default">Default</string>
+
     <string name="settings_language">Language</string>
     <string name="language_system">System Default</string>
     <string name="language_en">English</string>
     <string name="language_zh_tw">Traditional Chinese (Taiwan)</string>
     <string name="language_restart_note">Some screens may refresh after changing language.</string>
+    <string name="language_game_apply_later">Language will apply after returning to the main screen or reopening the game.</string>
 
+    <string name="settings_title">Settings</string>
     <string name="settings_display">Display</string>
+    <string name="settings_display_settings">Display Settings</string>
+    <string name="settings_controller_settings">Controller Settings</string>
     <string name="settings_screen_scaling">Screen Scaling</string>
     <string name="display_fit_screen">Fit Screen</string>
     <string name="display_original_ratio">Original Ratio</string>
@@ -25,18 +34,46 @@
 
     <string name="settings_controller">Controller</string>
     <string name="settings_use_controller_skin">Use Controller Skin</string>
+    <string name="settings_controller_skin_format">Controller Skin: %1$s</string>
     <string name="settings_select_skin_style">Select Skin Style</string>
+    <string name="settings_select_skin_format">Select Skin: Style %1$02d</string>
     <string name="skin_style_01">Style 01 (Original)</string>
     <string name="skin_style_02">Style 02</string>
     <string name="skin_style_03">Style 03</string>
+    <string name="settings_button_size_default">Button Size: Default</string>
+    <string name="settings_button_opacity_default">Button Opacity: Default</string>
+    <string name="settings_controller_pending">Controller customization will be added in a later build.</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_edit_controller_layout">Edit Controller Layout</string>
 
     <string name="settings_audio_preset">Audio Preset</string>
     <string name="audio_dynamic">Dynamic - recommended</string>
     <string name="audio_1024">1024 - ultra low latency</string>
+    <string name="audio_1024_may_crackle">1024 - ultra low latency, may crackle</string>
     <string name="audio_2048">2048 - low latency</string>
     <string name="audio_4096">4096 - balanced</string>
+
+    <string name="quick_menu_title">KrendBuoy Menu</string>
+    <string name="quick_menu_resume">Resume</string>
+    <string name="quick_menu_restart_game">Restart Game</string>
+    <string name="quick_menu_return_main_menu">Return to Main Menu</string>
+
+    <string name="save_state_title">Save State</string>
+    <string name="load_state_title">Load State</string>
+    <string name="load_state_with_rom_format">Load State - %1$s</string>
+    <string name="overwrite_save_state_title">Overwrite Save State</string>
+    <string name="overwrite_save_state_message_format">Slot %1$d already has a save state.\n%2$s\n\nOverwrite it?</string>
+    <string name="overwrite">Overwrite</string>
+    <string name="slot_empty_format">Slot %1$d is empty</string>
+    <string name="save_state_saved_format">Saved Slot %1$d</string>
+    <string name="save_state_write_failed">Save state write failed</string>
+    <string name="save_state_failed_format">Save state failed: %1$s</string>
+    <string name="load_state_loaded_format">Loaded Slot %1$d</string>
+    <string name="load_state_failed">Load state failed</string>
+    <string name="load_state_failed_format">Load state failed: %1$s</string>
+    <string name="no_save_state_in_slot_format">No save state found in Slot %1$d.</string>
+    <string name="auto_save_loading">Auto-Save (Loading...)</string>
+    <string name="slot_loading_format">Slot %1$d (Loading...)</string>
 
     <string name="tab_games">GAMES</string>
     <string name="tab_settings">SETTINGS</string>
