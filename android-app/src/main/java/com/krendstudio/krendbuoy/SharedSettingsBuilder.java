@@ -58,7 +58,7 @@ final class SharedSettingsBuilder {
                         dialog.dismiss();
                         activity.recreate();
                     })
-                    .setMessage(activity.getString(R.string.language_restart_note))
+                    .setNegativeButton(android.R.string.cancel, null)
                     .show();
         }), blockParams(activity, 0, 8, 0, 24));
 
