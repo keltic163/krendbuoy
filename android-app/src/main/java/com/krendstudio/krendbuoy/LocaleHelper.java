@@ -3,6 +3,7 @@ package com.krendstudio.krendbuoy;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.LocaleList;
 
 import java.util.Locale;
@@ -21,7 +22,9 @@ final class LocaleHelper {
         Locale.setDefault(locale);
         Configuration config = new Configuration(context.getResources().getConfiguration());
         config.setLocale(locale);
-        config.setLocales(new LocaleList(locale));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            config.setLocales(new LocaleList(locale));
+        }
         return new ContextWrapper(context.createConfigurationContext(config));
     }
 
