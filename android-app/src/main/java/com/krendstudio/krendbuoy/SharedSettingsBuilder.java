@@ -55,6 +55,7 @@ final class SharedSettingsBuilder {
                     .setTitle(activity.getString(R.string.settings_language))
                     .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                         sm.setLanguageMode(values[which]);
+                        LocaleHelper.applyTo(activity);
                         dialog.dismiss();
                         activity.recreate();
                     })
