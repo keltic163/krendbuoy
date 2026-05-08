@@ -27,13 +27,13 @@ final class GameQuickMenu {
         // Removed "Display Settings" and "Audio Preset" as they are in global settings.
         // Moved "Return to Main Menu" to the last option.
         String[] items = {
-                "Resume",
-                "Restart Game",
-                "Return to Main Menu"
+                activity.getString(R.string.quick_menu_resume),
+                activity.getString(R.string.quick_menu_restart_game),
+                activity.getString(R.string.quick_menu_return_main_menu)
         };
 
         new AlertDialog.Builder(activity)
-                .setTitle("KrendBuoy Menu")
+                .setTitle(activity.getString(R.string.quick_menu_title))
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {
                         host.resumeEmulationFromMenu();
