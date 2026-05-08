@@ -6,6 +6,11 @@
     <string name="common_on">開啟</string>
     <string name="common_off">關閉</string>
     <string name="common_default">預設</string>
+    <string name="common_yes">是</string>
+    <string name="common_no">否</string>
+    <string name="common_found">已找到</string>
+    <string name="common_missing">缺少</string>
+    <string name="common_never">從未</string>
 
     <string name="settings_language">語言</string>
     <string name="language_system">跟隨系統</string>
@@ -82,4 +87,30 @@
     <string name="no_folder_selected">尚未選擇資料夾</string>
     <string name="choose_save_rom_folder">請先選擇存檔 / ROM 資料夾。ROM 檔案必須放在該資料夾內。</string>
     <string name="no_rom_files_found">此資料夾中找不到 .gba、.gbc 或 .gb 檔案。</string>
+    <string name="sort_rom_list">排序 ROM 清單</string>
+    <string name="sort_last_played">最後遊玩</string>
+    <string name="sort_name_asc">名稱 A → Z</string>
+    <string name="sort_name_desc">名稱 Z → A</string>
+    <string name="sort_state_count">儲存狀態數量</string>
+    <string name="sort_recently_added">最近新增</string>
+    <string name="rom_action_launch_game">啟動遊戲</string>
+    <string name="rom_action_load_state_slot">讀取狀態 Slot</string>
+    <string name="rom_action_pin_favorite">釘選最愛</string>
+    <string name="rom_action_unpin_favorite">取消釘選最愛</string>
+    <string name="rom_action_show_file_info">顯示檔案資訊</string>
+    <string name="rom_action_refresh_status">重新整理狀態</string>
+    <string name="file_info_title">檔案資訊</string>
+    <string name="load_state_notice_title">讀取狀態</string>
+    <string name="rom_list_failed_title">ROM 清單失敗</string>
+    <string name="rom_list_failed_default">無法列出選取的資料夾。</string>
+    <string name="core_unavailable_title">核心無法使用</string>
+    <string name="folder_required_title">需要資料夾</string>
+    <string name="folder_required_message">開始遊戲前，請先選擇存檔 / ROM 資料夾。</string>
+    <string name="sav_found">找到 SAV</string>
+    <string name="no_sav">沒有 SAV</string>
+    <string name="state_count_format">狀態 x%1$d</string>
+    <string name="no_state">沒有狀態</string>
+    <string name="pinned">已釘選</string>
+    <string name="last_played_format">最後遊玩：%1$s</string>
+    <string name="file_info_format">%1$s\n\n最愛：%2$s\nSAV：%3$s\nSTATE：%4$d\n最後遊玩：%5$s\n資料夾：%6$s</string>
 </resources>
