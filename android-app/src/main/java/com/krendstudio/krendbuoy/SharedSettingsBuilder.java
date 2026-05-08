@@ -5,7 +5,6 @@ import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -37,13 +36,44 @@ final class SharedSettingsBuilder {
         root.setPadding(dp(activity, 16), dp(activity, 16), dp(activity, 16), dp(activity, 16));
         scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // Display Settings Section
-        root.addView(sectionTitle(activity, "Display"));
-        
-        root.addView(makeSettingButton(activity, "Screen Scaling", () -> {
-            String[] labels = {"Fit Screen", "Original Ratio", "Stretch", "Pixel Perfect (2x)"};
+        root.addView(sectionTitle(activity, activity.getString(R.string.settings_language)));
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_language), () -> {
+            String[] labels = {
+                    activity.getString(R.string.language_system),
+                    activity.getString(R.string.language_en),
+                    activity.getString(R.string.language_zh_tw)
+            };
+            int[] values = {
+                    AppSettingsManager.LANGUAGE_SYSTEM,
+                    AppSettingsManager.LANGUAGE_EN,
+                    AppSettingsManager.LANGUAGE_ZH_TW
+            };
+            int checked = 0;
+            int current = sm.getLanguageMode();
+            for (int i = 0; i < values.length; i++) if (values[i] == current) checked = i;
             new AlertDialog.Builder(activity)
-                    .setTitle("Screen Scaling")
+                    .setTitle(activity.getString(R.string.settings_language))
+                    .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                        sm.setLanguageMode(values[which]);
+                        dialog.dismiss();
+                        activity.recreate();
+                    })
+                    .setMessage(activity.getString(R.string.language_restart_note))
+                    .show();
+        }), blockParams(activity, 0, 8, 0, 24));
+
+        // Display Settings Section
+        root.addView(sectionTitle(activity, activity.getString(R.string.settings_display)));
+        
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_screen_scaling), () -> {
+            String[] labels = {
+                    activity.getString(R.string.display_fit_screen),
+                    activity.getString(R.string.display_original_ratio),
+                    activity.getString(R.string.display_stretch),
+                    activity.getString(R.string.display_pixel_perfect)
+            };
+            new AlertDialog.Builder(activity)
+                    .setTitle(activity.getString(R.string.settings_screen_scaling))
                     .setSingleChoiceItems(labels, sm.getDisplayMode(), (dialog, which) -> {
                         sm.setDisplayMode(which);
                         host.onSettingChanged();
@@ -51,10 +81,15 @@ final class SharedSettingsBuilder {
                     }).show();
         }), blockParams(activity, 0, 8, 0, 12));
 
-        root.addView(makeSettingButton(activity, "Screen Brightness", () -> {
-            String[] labels = {"Brightest (100%)", "Bright (80%)", "Medium (60%)", "Dim (40%)"};
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_screen_brightness), () -> {
+            String[] labels = {
+                    activity.getString(R.string.brightness_brightest),
+                    activity.getString(R.string.brightness_bright),
+                    activity.getString(R.string.brightness_medium),
+                    activity.getString(R.string.brightness_dim)
+            };
             new AlertDialog.Builder(activity)
-                    .setTitle("Screen Brightness")
+                    .setTitle(activity.getString(R.string.settings_screen_brightness))
                     .setSingleChoiceItems(labels, sm.getBgDimmingLevel(), (dialog, which) -> {
                         sm.setBgDimmingLevel(which);
                         host.onSettingChanged();
@@ -62,33 +97,37 @@ final class SharedSettingsBuilder {
                     }).show();
         }), blockParams(activity, 0, 0, 0, 12));
 
-        root.addView(makeSettingToggle(activity, "Color Correction", sm.isColorCorrectionEnabled(), enabled -> {
+        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_color_correction), sm.isColorCorrectionEnabled(), enabled -> {
             sm.setColorCorrectionEnabled(enabled);
             host.onSettingChanged();
         }), blockParams(activity, 0, 0, 0, 12));
         
-        root.addView(makeSettingToggle(activity, "Screen Border", sm.isScreenBorderEnabled(), enabled -> {
+        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_screen_border), sm.isScreenBorderEnabled(), enabled -> {
             sm.setScreenBorderEnabled(enabled);
             host.onSettingChanged();
         }), blockParams(activity, 0, 0, 0, 12));
 
-        root.addView(makeSettingToggle(activity, "Show Debug Info (FPS)", sm.isDebugTextVisible(), enabled -> {
+        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_show_debug_info), sm.isDebugTextVisible(), enabled -> {
             sm.setDebugTextVisible(enabled);
             host.onSettingChanged();
         }), blockParams(activity, 0, 0, 0, 24));
 
         // Controller Settings Section
-        root.addView(sectionTitle(activity, "Controller"));
+        root.addView(sectionTitle(activity, activity.getString(R.string.settings_controller)));
         
-        root.addView(makeSettingToggle(activity, "Use Controller Skin", sm.isControllerSkinEnabled(), enabled -> {
+        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_use_controller_skin), sm.isControllerSkinEnabled(), enabled -> {
             sm.setControllerSkinEnabled(enabled);
             host.onSettingChanged();
         }), blockParams(activity, 0, 8, 0, 12));
 
-        root.addView(makeSettingButton(activity, "Select Skin Style", () -> {
-            String[] skins = {"Style 01 (Original)", "Style 02", "Style 03"};
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_select_skin_style), () -> {
+            String[] skins = {
+                    activity.getString(R.string.skin_style_01),
+                    activity.getString(R.string.skin_style_02),
+                    activity.getString(R.string.skin_style_03)
+            };
             new AlertDialog.Builder(activity)
-                    .setTitle("Select Skin Style")
+                    .setTitle(activity.getString(R.string.settings_select_skin_style))
                     .setSingleChoiceItems(skins, sm.getControllerSkinId() - 1, (dialog, which) -> {
                         sm.setControllerSkinId(which + 1);
                         host.onSettingChanged();
@@ -98,23 +137,23 @@ final class SharedSettingsBuilder {
 
         // Layout Editor - Only show if the host provides a valid edit action
         if (activity instanceof GameActivityV2) {
-            root.addView(sectionTitle(activity, "Layout"));
-            root.addView(makeSettingButton(activity, "Edit Controller Layout", () -> {
+            root.addView(sectionTitle(activity, activity.getString(R.string.settings_layout)));
+            root.addView(makeSettingButton(activity, activity.getString(R.string.settings_edit_controller_layout), () -> {
                 host.onEditLayout();
             }), blockParams(activity, 0, 8, 0, 24));
         }
 
         // Audio Settings Section
-        root.addView(sectionTitle(activity, "Audio Preset"));
+        root.addView(sectionTitle(activity, activity.getString(R.string.settings_audio_preset)));
         RadioGroup audioGroup = new RadioGroup(activity);
         audioGroup.setOrientation(RadioGroup.VERTICAL);
         audioGroup.setBackground(makeRoundRect(Color.rgb(28, 39, 58), dp(activity, 10)));
         audioGroup.setPadding(dp(activity, 12), dp(activity, 8), dp(activity, 12), dp(activity, 8));
         
-        addAudioOption(activity, audioGroup, 100000, "Dynamic - recommended");
-        addAudioOption(activity, audioGroup, 1024, "1024 - ultra low latency");
-        addAudioOption(activity, audioGroup, 2048, "2048 - low latency");
-        addAudioOption(activity, audioGroup, 4096, "4096 - balanced");
+        addAudioOption(activity, audioGroup, 100000, activity.getString(R.string.audio_dynamic));
+        addAudioOption(activity, audioGroup, 1024, activity.getString(R.string.audio_1024));
+        addAudioOption(activity, audioGroup, 2048, activity.getString(R.string.audio_2048));
+        addAudioOption(activity, audioGroup, 4096, activity.getString(R.string.audio_4096));
         
         int currentAudio = sm.getAudioPreset();
         audioGroup.check(currentAudio == AppSettingsManager.AUDIO_DYNAMIC ? 100000 : currentAudio);
