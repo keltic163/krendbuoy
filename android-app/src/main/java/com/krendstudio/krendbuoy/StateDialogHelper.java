@@ -79,7 +79,9 @@ final class StateDialogHelper {
                 layout.setAlpha(canSelect ? 1.0f : 0.4f);
                 layout.setClickable(!canSelect); // Parent ListView handles clicks, but this helps visual
                 
-                String loadingText = isAutoSave ? "Auto-Save (Loading...)" : "Slot " + slot + " (Loading...)";
+                String loadingText = isAutoSave
+                        ? activity.getString(R.string.auto_save_loading)
+                        : activity.getString(R.string.slot_loading_format, slot);
                 text.setText(loadingText);
                 
                 Bitmap cached = cache != null ? cache.get(slot) : null;
@@ -110,7 +112,7 @@ final class StateDialogHelper {
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle(title)
                 .setView(listView)
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .setOnDismissListener(d -> callback.onDismiss())
                 .show();
 
