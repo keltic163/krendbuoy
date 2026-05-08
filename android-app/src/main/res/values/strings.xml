@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KrendBuoy</string>
+
+    <string name="settings_language">Language</string>
+    <string name="language_system">System Default</string>
+    <string name="language_en">English</string>
+    <string name="language_zh_tw">Traditional Chinese (Taiwan)</string>
+    <string name="language_restart_note">Some screens may refresh after changing language.</string>
+
+    <string name="settings_display">Display</string>
+    <string name="settings_screen_scaling">Screen Scaling</string>
+    <string name="display_fit_screen">Fit Screen</string>
+    <string name="display_original_ratio">Original Ratio</string>
+    <string name="display_stretch">Stretch</string>
+    <string name="display_pixel_perfect">Pixel Perfect (2x)</string>
+    <string name="settings_screen_brightness">Screen Brightness</string>
+    <string name="brightness_brightest">Brightest (100%)</string>
+    <string name="brightness_bright">Bright (80%)</string>
+    <string name="brightness_medium">Medium (60%)</string>
+    <string name="brightness_dim">Dim (40%)</string>
+    <string name="settings_color_correction">Color Correction</string>
+    <string name="settings_screen_border">Screen Border</string>
+    <string name="settings_show_debug_info">Show Debug Info (FPS)</string>
+
+    <string name="settings_controller">Controller</string>
+    <string name="settings_use_controller_skin">Use Controller Skin</string>
+    <string name="settings_select_skin_style">Select Skin Style</string>
+    <string name="skin_style_01">Style 01 (Original)</string>
+    <string name="skin_style_02">Style 02</string>
+    <string name="skin_style_03">Style 03</string>
+    <string name="settings_layout">Layout</string>
+    <string name="settings_edit_controller_layout">Edit Controller Layout</string>
+
+    <string name="settings_audio_preset">Audio Preset</string>
+    <string name="audio_dynamic">Dynamic - recommended</string>
+    <string name="audio_1024">1024 - ultra low latency</string>
+    <string name="audio_2048">2048 - low latency</string>
+    <string name="audio_4096">4096 - balanced</string>
+
+    <string name="tab_games">GAMES</string>
+    <string name="tab_settings">SETTINGS</string>
+    <string name="folder_control">Folder Control</string>
+    <string name="change_folder">Change Folder</string>
+    <string name="no_folder_selected">No folder selected</string>
+    <string name="choose_save_rom_folder">Choose a Save / ROM folder first. ROM files must be inside that folder.</string>
+    <string name="no_rom_files_found">No .gba, .gbc, or .gb files found in this folder.</string>
+</resources>
