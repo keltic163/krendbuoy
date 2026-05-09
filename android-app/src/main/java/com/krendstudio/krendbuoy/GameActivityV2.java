@@ -190,7 +190,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         cheatManager.applyToCore();
         if (pokemonManager != null) pokemonManager.detectVersion();
         loadStartupStateIfRequested();
-        updateInfo("Running... speed " + emulationSpeedLabel() + " audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+        updateInfo("Running... speed " + emulationSpeedLabel() + " audio preset " + AppSettingsManager.audioPresetLabel(this, audioBacklogSamples) + "\n" + NativeBridge.getLastError());
         menuPaused = false;
         restarting = false;
         startAudioPlayback();
@@ -555,7 +555,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                     audioBacklogSamples = values[which];
                     settingsManager.setAudioPreset(audioBacklogSamples);
                     NativeBridge.setAudioMaxBufferedSamples(audioBacklogSamples);
-                    updateInfo("audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
+                    updateInfo("audio preset " + AppSettingsManager.audioPresetLabel(this, audioBacklogSamples) + "\n" + NativeBridge.getLastError());
                     dialog.dismiss();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
