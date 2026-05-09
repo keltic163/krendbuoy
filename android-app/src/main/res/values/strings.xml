@@ -28,6 +28,9 @@
     <string name="display_integer_scale">Integer Scale</string>
     <string name="display_stretch">Stretch</string>
     <string name="settings_color_mode">Color Mode</string>
+    <string name="color_mode_standard">Standard</string>
+    <string name="color_mode_gba">GBA Color</string>
+    <string name="color_mode_grayscale">Grayscale</string>
     <string name="settings_screen_border">Screen Border</string>
     <string name="settings_show_debug_info">Show Debug Info (FPS)</string>
 

@@ -28,6 +28,9 @@
     <string name="display_integer_scale">整數縮放</string>
     <string name="display_stretch">拉伸填滿</string>
     <string name="settings_color_mode">色彩模式</string>
+    <string name="color_mode_standard">標準</string>
+    <string name="color_mode_gba">GBA 原始發色</string>
+    <string name="color_mode_grayscale">黑白 (灰階)</string>
     <string name="settings_screen_border">畫面邊框</string>
     <string name="settings_show_debug_info">顯示除錯資訊（FPS）</string>
 

@@ -20,6 +20,10 @@ final class AppSettingsManager {
     static final int LANGUAGE_EN = 1;
     static final int LANGUAGE_ZH_TW = 2;
 
+    static final int COLOR_MODE_STANDARD = 0;
+    static final int COLOR_MODE_GBA = 1;
+    static final int COLOR_MODE_GRAYSCALE = 2;
+
     private static final String KEY_AUDIO_PRESET = "audio_preset";
     private static final String KEY_DISPLAY_MODE = "display_mode";
     private static final String KEY_DEBUG_TEXT_VISIBLE = "debug_text_visible";
@@ -59,12 +63,12 @@ final class AppSettingsManager {
         prefs.edit().putInt(KEY_DISPLAY_MODE, value).apply();
     }
 
-    boolean isColorModeEnabled() {
-        return prefs.getBoolean(KEY_COLOR_MODE, true);
+    int getColorMode() {
+        return prefs.getInt(KEY_COLOR_MODE, COLOR_MODE_STANDARD);
     }
 
-    void setColorModeEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_COLOR_MODE, enabled).apply();
+    void setColorMode(int value) {
+        prefs.edit().putInt(KEY_COLOR_MODE, value).apply();
     }
 
     boolean isScreenBorderEnabled() {
@@ -189,6 +193,12 @@ final class AppSettingsManager {
         if (value == SCALE_INTEGER) return context.getString(R.string.display_integer_scale);
         if (value == SCALE_STRETCH) return context.getString(R.string.display_stretch);
         return context.getString(R.string.display_auto_fit);
+    }
+
+    static String colorModeLabel(android.content.Context context, int value) {
+        if (value == COLOR_MODE_GBA) return context.getString(R.string.color_mode_gba);
+        if (value == COLOR_MODE_GRAYSCALE) return context.getString(R.string.color_mode_grayscale);
+        return context.getString(R.string.color_mode_standard);
     }
 
     static String themeLabel(android.content.Context context, int value) {

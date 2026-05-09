@@ -43,6 +43,7 @@ static std::atomic_uint inputQueryCount{0};
 static std::atomic_uint controllerDeviceSet{0};
 static std::atomic_int audioMode{-1};
 static std::atomic<size_t> audioMaxSamples{4096};
+static std::atomic_int colorMode{0};
 
 static constexpr int BTN_A = 0;
 static constexpr int BTN_B = 1;
@@ -137,10 +138,39 @@ static uint32_t rgb565ToArgb(uint16_t p) {
     uint8_t r = static_cast<uint8_t>(((p >> 11) & 0x1F) * 255 / 31);
     uint8_t g = static_cast<uint8_t>(((p >> 5) & 0x3F) * 255 / 63);
     uint8_t b = static_cast<uint8_t>((p & 0x1F) * 255 / 31);
+
+    int mode = colorMode.load();
+    if (mode == 1) { // GBA Color simulation
+        uint8_t nr = std::min(255, (r * 7 + g * 1 + b * 1) / 8);
+        uint8_t ng = std::min(255, (g * 7 + r * 1 + b * 1) / 8);
+        uint8_t nb = std::min(255, (b * 7 + r * 1 + g * 1) / 8);
+        r = nr; g = ng; b = nb;
+    } else if (mode == 2) { // Grayscale
+        uint8_t gray = static_cast<uint8_t>((r * 299 + g * 587 + b * 114) / 1000);
+        r = g = b = gray;
+    }
+
     return 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
 }
 
-static uint32_t xrgb8888ToArgb(uint32_t p) { return 0xFF000000u | (p & 0x00FFFFFFu); }
+static uint32_t xrgb8888ToArgb(uint32_t p) {
+    uint8_t r = (p >> 16) & 0xFF;
+    uint8_t g = (p >> 8) & 0xFF;
+    uint8_t b = p & 0xFF;
+
+    int mode = colorMode.load();
+    if (mode == 1) { // GBA Color simulation
+        uint8_t nr = std::min(255, (r * 7 + g * 1 + b * 1) / 8);
+        uint8_t ng = std::min(255, (g * 7 + r * 1 + b * 1) / 8);
+        uint8_t nb = std::min(255, (b * 7 + r * 1 + g * 1) / 8);
+        r = nr; g = ng; b = nb;
+    } else if (mode == 2) { // Grayscale
+        uint8_t gray = static_cast<uint8_t>((r * 299 + g * 587 + b * 114) / 1000);
+        r = g = b = gray;
+    }
+
+    return 0xFF000000u | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+}
 
 static unsigned buildRetroJoypadMask() {
     unsigned mask = 0;
@@ -366,6 +396,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_se
     while (!inputMask.compare_exchange_weak(current, down ? (current | bit) : (current & ~bit))) {}
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_getInputMask(JNIEnv*, jclass) { return static_cast<jint>(inputMask.load()); }
+extern "C" JNIEXPORT void JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_setColorMode(JNIEnv*, jclass, jint mode) {
+    colorMode.store(mode);
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_com_krendstudio_krendbuoy_NativeBridge_getAudioSampleRate(JNIEnv*, jclass) {
     int rate = static_cast<int>(avInfo.timing.sample_rate);
     return rate > 0 ? rate : FALLBACK_SAMPLE_RATE;

@@ -48,7 +48,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private String romBaseName = "selected";
     private int displayMode = AppSettingsManager.SCALE_AUTO_FIT;
     private boolean debugTextVisible = false;
-    private boolean colorModeEnabled = true;
     private boolean screenBorderEnabled = false;
     private int startupLoadStateSlot = 0;
     private SaveStateManager saveStateManager;
@@ -75,8 +74,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         audioBacklogSamples = settingsManager.getAudioPreset();
         displayMode = settingsManager.getDisplayMode();
         debugTextVisible = settingsManager.isDebugTextVisible();
-        colorModeEnabled = settingsManager.isColorModeEnabled();
         screenBorderEnabled = settingsManager.isScreenBorderEnabled();
+        NativeBridge.setColorMode(settingsManager.getColorMode());
         pokemonManager = new PokemonManager();
         memoryScanner = new MemoryScanner();
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
@@ -432,7 +431,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .setTitle(getString(R.string.settings_display_settings))
                 .setItems(sections, (dialog, which) -> {
                     if (which == 0) showScalingDialog();
-                    else if (which == 1) toggleColorMode();
+                    else if (which == 1) showColorModeDialog();
                     else if (which == 2) toggleScreenBorder();
                     else if (which == 3) toggleDebugText();
                 })
@@ -459,11 +458,21 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .show();
     }
 
-    private void toggleColorMode() {
-        colorModeEnabled = !colorModeEnabled;
-        settingsManager.setColorModeEnabled(colorModeEnabled);
-        showToast(getString(R.string.settings_color_mode) + ": " + (colorModeEnabled ? getString(R.string.common_on) : getString(R.string.common_off)));
-        resumeEmulationFromMenu();
+    private void showColorModeDialog() {
+        String[] labels = {
+                getString(R.string.color_mode_standard),
+                getString(R.string.color_mode_gba),
+                getString(R.string.color_mode_grayscale)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.settings_color_mode))
+                .setSingleChoiceItems(labels, settingsManager.getColorMode(), (dialog, which) -> {
+                    settingsManager.setColorMode(which);
+                    NativeBridge.setColorMode(which);
+                    dialog.dismiss();
+                    resumeEmulationFromMenu();
+                })
+                .show();
     }
 
     private void toggleScreenBorder() {

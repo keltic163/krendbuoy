@@ -40,6 +40,8 @@ public final class NativeBridge {
 
     public static native int getInputMask();
 
+    public static native void setColorMode(int mode);
+
     public static native int getAudioSampleRate();
 
     public static native void setAudioMaxBufferedSamples(int samples);

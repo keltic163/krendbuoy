@@ -86,9 +86,20 @@ final class SharedSettingsBuilder {
                     }).show();
         }), blockParams(activity, 0, 8, 0, 12));
 
-        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_color_mode), sm.isColorModeEnabled(), enabled -> {
-            sm.setColorModeEnabled(enabled);
-            host.onSettingChanged();
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_color_mode), () -> {
+            String[] labels = {
+                    activity.getString(R.string.color_mode_standard),
+                    activity.getString(R.string.color_mode_gba),
+                    activity.getString(R.string.color_mode_grayscale)
+            };
+            new AlertDialog.Builder(activity)
+                    .setTitle(activity.getString(R.string.settings_color_mode))
+                    .setSingleChoiceItems(labels, sm.getColorMode(), (dialog, which) -> {
+                        sm.setColorMode(which);
+                        NativeBridge.setColorMode(which);
+                        host.onSettingChanged();
+                        dialog.dismiss();
+                    }).show();
         }), blockParams(activity, 0, 0, 0, 12));
         
         root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_screen_border), sm.isScreenBorderEnabled(), enabled -> {
