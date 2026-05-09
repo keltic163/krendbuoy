@@ -81,7 +81,7 @@ final class FrameLoopManager {
                         host.runOnUiThread(() -> screen.setImageBitmap(displayBitmap));
                     }
                     if (frame % 30 == 0) {
-                        host.updateFrameInfo("audio preset " + host.audioPresetLabelForFrameLoop() + "\n" + NativeBridge.getLastError());
+                        host.updateFrameInfo(host.audioPresetLabelForFrameLoop() + "\n" + NativeBridge.getLastError());
                     }
                 } else {
                     host.updateFrameInfo("runFrame failed:\n" + NativeBridge.getLastError());

@@ -47,7 +47,7 @@ final class SaveStateManager {
     String slotLabel(int slot) {
         long modified = getModifiedTime(slot);
         String prefix = (slot == AUTO_SAVE_SLOT) ? "Auto-Save" : "Slot " + slot;
-        if (modified <= 0) return prefix + " - Empty";
+        if (modified <= 0) return prefix + " - " + activity.getString(R.string.common_missing).toLowerCase();
         return prefix + " - " + new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(new Date(modified));
     }
 

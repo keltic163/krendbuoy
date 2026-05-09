@@ -64,6 +64,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
 
     @Override
+    protected void attachBaseContext(android.content.Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         settingsManager = new AppSettingsManager(this);
@@ -249,7 +254,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     @Override
     public String audioPresetLabelForFrameLoop() {
-        return AppSettingsManager.audioPresetLabel(audioBacklogSamples);
+        return getString(R.string.settings_audio_preset) + " " + AppSettingsManager.audioPresetLabel(this, audioBacklogSamples);
     }
 
     @Override
@@ -346,7 +351,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         pauseEmulationForMenu();
         if (saveStateManager == null) saveStateManager = new SaveStateManager(this, portableSaveFolderUri, romSessionManager.ensureDirectory("states"), romBaseName);
         
-        StateDialogHelper.show(this, save ? "Save State" : "Load State", saveStateManager, thumbnailCache, new StateDialogHelper.Callback() {
+        StateDialogHelper.show(this, save ? getString(R.string.save_state_title) : getString(R.string.load_state_title), saveStateManager, thumbnailCache, new StateDialogHelper.Callback() {
             @Override
             public void onSlotSelected(int slot) {
                 if (save) confirmAndSaveState(slot);
@@ -367,10 +372,10 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             return;
         }
         new AlertDialog.Builder(this)
-                .setTitle("Overwrite Save State")
-                .setMessage("Slot " + slot + " already has a save state.\n" + saveStateManager.slotLabel(slot) + "\n\nOverwrite it?")
-                .setPositiveButton("Overwrite", (dialog, which) -> saveStateNow(slot))
-                .setNegativeButton("Cancel", (dialog, which) -> resumeEmulationFromMenu())
+                .setTitle(getString(R.string.overwrite_save_state_title))
+                .setMessage(getString(R.string.overwrite_save_state_message_format, slot, saveStateManager.slotLabel(slot)))
+                .setPositiveButton(getString(R.string.overwrite), (dialog, which) -> saveStateNow(slot))
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
     }
@@ -382,12 +387,12 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             boolean ok = saveStateManager.write(data, slot, thumb);
             if (ok) {
                 if (thumb != null) thumbnailCache.put(slot, thumb);
-                showToast("Saved Slot " + slot);
+                showToast(getString(R.string.save_state_saved_format, slot));
             } else {
-                showToast("Save state write failed");
+                showToast(getString(R.string.save_state_write_failed));
             }
         } catch (Throwable t) {
-            showToast("Save state failed: " + safeMessage(t));
+            showToast(getString(R.string.save_state_failed_format, safeMessage(t)));
         }
         resumeEmulationFromMenu();
     }
@@ -413,14 +418,14 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         try {
             byte[] data = saveStateManager.read(slot);
             if (data == null || data.length == 0) {
-                showToast("Slot " + slot + " is empty");
+                showToast(getString(R.string.slot_empty_format, slot));
                 resumeEmulationFromMenu();
                 return;
             }
             boolean ok = NativeBridge.importState(data);
-            showToast(ok ? "Loaded Slot " + slot : "Load state failed");
+            showToast(ok ? getString(R.string.load_state_loaded_format, slot) : getString(R.string.load_state_failed));
         } catch (Throwable t) {
-            showToast("Load state failed: " + safeMessage(t));
+            showToast(getString(R.string.load_state_failed_format, safeMessage(t)));
         }
         resumeEmulationFromMenu();
     }
@@ -428,9 +433,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public void showDisplaySettingsDialog() {
         pauseEmulationForMenu();
-        String[] sections = {"Screen Scaling", "Color Correction", "Background Dimming", "Screen Border", "Debug Text"};
+        String[] sections = {
+                getString(R.string.settings_screen_scaling),
+                getString(R.string.settings_color_correction),
+                getString(R.string.settings_screen_brightness),
+                getString(R.string.settings_screen_border),
+                getString(R.string.settings_show_debug_info)
+        };
         new AlertDialog.Builder(this)
-                .setTitle("Display Settings")
+                .setTitle(getString(R.string.settings_display_settings))
                 .setItems(sections, (dialog, which) -> {
                     if (which == 0) showScalingDialog();
                     else if (which == 1) toggleColorCorrection();
@@ -438,15 +449,20 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                     else if (which == 3) toggleScreenBorder();
                     else if (which == 4) toggleDebugText();
                 })
-                .setNegativeButton("Back", (dialog, which) -> resumeEmulationFromMenu())
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
                 .show();
     }
 
     private void showScalingDialog() {
-        String[] labels = {"Fit Screen", "Original Ratio", "Stretch", "Pixel Perfect (2x)"};
+        String[] labels = {
+                getString(R.string.display_fit_screen),
+                getString(R.string.display_original_ratio),
+                getString(R.string.display_stretch),
+                getString(R.string.display_pixel_perfect)
+        };
         new AlertDialog.Builder(this)
-                .setTitle("Screen Scaling")
+                .setTitle(getString(R.string.settings_screen_scaling))
                 .setSingleChoiceItems(labels, displayMode, (dialog, which) -> {
                     displayMode = which;
                     settingsManager.setDisplayMode(displayMode);
@@ -460,14 +476,19 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private void toggleColorCorrection() {
         colorCorrectionEnabled = !colorCorrectionEnabled;
         settingsManager.setColorCorrectionEnabled(colorCorrectionEnabled);
-        showToast("Color Correction: " + (colorCorrectionEnabled ? "On" : "Off"));
+        showToast(getString(R.string.settings_color_correction) + ": " + (colorCorrectionEnabled ? getString(R.string.common_on) : getString(R.string.common_off)));
         resumeEmulationFromMenu();
     }
 
     private void showDimmingDialog() {
-        String[] labels = {"Brightest (100%)", "Bright (80%)", "Medium (60%)", "Dim (40%)"};
+        String[] labels = {
+                getString(R.string.brightness_brightest),
+                getString(R.string.brightness_bright),
+                getString(R.string.brightness_medium),
+                getString(R.string.brightness_dim)
+        };
         new AlertDialog.Builder(this)
-                .setTitle("Screen Brightness")
+                .setTitle(getString(R.string.settings_screen_brightness))
                 .setSingleChoiceItems(labels, bgDimmingLevel, (dialog, which) -> {
                     bgDimmingLevel = which;
                     settingsManager.setBgDimmingLevel(bgDimmingLevel);
@@ -519,12 +540,17 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     public void showAudioPresetDialog() {
         pauseEmulationForMenu();
-        String[] labels = {"Dynamic - recommended", "1024 - ultra low latency, may crackle", "2048 - low latency", "4096 - balanced"};
+        String[] labels = {
+                getString(R.string.audio_dynamic),
+                getString(R.string.audio_1024),
+                getString(R.string.audio_2048),
+                getString(R.string.audio_4096)
+        };
         int[] values = {AppSettingsManager.AUDIO_DYNAMIC, AppSettingsManager.AUDIO_1024, AppSettingsManager.AUDIO_2048, AppSettingsManager.AUDIO_4096};
         int checked = 0;
         for (int i = 0; i < values.length; i++) if (values[i] == audioBacklogSamples) checked = i;
         new AlertDialog.Builder(this)
-                .setTitle("Audio Preset")
+                .setTitle(getString(R.string.settings_audio_preset))
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     audioBacklogSamples = values[which];
                     settingsManager.setAudioPreset(audioBacklogSamples);
@@ -532,7 +558,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                     updateInfo("audio preset " + AppSettingsManager.audioPresetLabel(audioBacklogSamples) + "\n" + NativeBridge.getLastError());
                     dialog.dismiss();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .setOnDismissListener(dialog -> resumeEmulationFromMenu())
                 .show();
     }
@@ -568,7 +594,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
             screen.setLayoutParams(lp);
         }
-        updateInfo("Display mode: " + AppSettingsManager.displayModeLabel(displayMode));
+        updateInfo(getString(R.string.settings_screen_scaling) + ": " + AppSettingsManager.displayModeLabel(this, displayMode));
     }
 
     private void showToast(String message) {

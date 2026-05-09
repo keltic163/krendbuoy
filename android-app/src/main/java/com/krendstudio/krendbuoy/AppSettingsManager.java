@@ -187,41 +187,41 @@ final class AppSettingsManager {
         return value == LANGUAGE_EN || value == LANGUAGE_ZH_TW ? value : LANGUAGE_SYSTEM;
     }
 
-    static String audioPresetLabel(int value) {
+    static String audioPresetLabel(android.content.Context context, int value) {
         value = normalizeAudioPreset(value);
         if (value == AUDIO_1024) return "1024";
         if (value == AUDIO_2048) return "2048";
         if (value == AUDIO_4096) return "4096";
-        return "Dynamic";
+        return context.getString(R.string.common_default);
     }
 
-    static String displayModeLabel(int value) {
-        if (value == DISPLAY_ORIGINAL_RATIO) return "Original Ratio";
-        if (value == DISPLAY_STRETCH) return "Stretch";
-        if (value == DISPLAY_PIXEL_PERFECT) return "Pixel Perfect (2x)";
-        return "Fit Screen";
+    static String displayModeLabel(android.content.Context context, int value) {
+        if (value == DISPLAY_ORIGINAL_RATIO) return context.getString(R.string.display_original_ratio);
+        if (value == DISPLAY_STRETCH) return context.getString(R.string.display_stretch);
+        if (value == DISPLAY_PIXEL_PERFECT) return context.getString(R.string.display_pixel_perfect);
+        return context.getString(R.string.display_fit_screen);
     }
 
-    static String themeLabel(int value) {
-        return "Default";
+    static String themeLabel(android.content.Context context, int value) {
+        return context.getString(R.string.common_default);
     }
 
-    static String languageLabel(int value) {
+    static String languageLabel(android.content.Context context, int value) {
         value = normalizeLanguageMode(value);
-        if (value == LANGUAGE_EN) return "English";
-        if (value == LANGUAGE_ZH_TW) return "Traditional Chinese (Taiwan)";
-        return "System Default";
+        if (value == LANGUAGE_EN) return context.getString(R.string.language_en);
+        if (value == LANGUAGE_ZH_TW) return context.getString(R.string.language_zh_tw);
+        return context.getString(R.string.language_system);
     }
 
-    static String controllerLayoutLabel(int value) {
-        return "Default";
+    static String controllerLayoutLabel(android.content.Context context, int value) {
+        return context.getString(R.string.common_default);
     }
 
-    static String buttonSizeLabel(int value) {
-        return "Default";
+    static String buttonSizeLabel(android.content.Context context, int value) {
+        return context.getString(R.string.common_default);
     }
 
-    static String buttonOpacityLabel(int value) {
-        return "Default";
+    static String buttonOpacityLabel(android.content.Context context, int value) {
+        return context.getString(R.string.common_default);
     }
 }

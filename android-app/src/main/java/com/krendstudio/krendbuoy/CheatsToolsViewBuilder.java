@@ -53,7 +53,7 @@ final class CheatsToolsViewBuilder {
         MemoryScanner scanner = host.getMemoryScanner();
 
         TextView scanTitle = new TextView(activity);
-        scanTitle.setText("Memory Scanner (Cheat Engine)");
+        scanTitle.setText(activity.getString(R.string.cheat_memory_scanner));
         scanTitle.setTextColor(Color.CYAN);
         scanTitle.setTypeface(null, Typeface.BOLD);
         scanTitle.setTextSize(14f);
@@ -62,15 +62,15 @@ final class CheatsToolsViewBuilder {
         LinearLayout scanRow = new LinearLayout(activity);
         scanRow.setOrientation(LinearLayout.HORIZONTAL);
         scanRow.setPadding(0, host.dp(8), 0, host.dp(8));
-        scanRow.addView(makeSystemButton(activity, "New Scan", () -> showValueInputDialog(activity, "First Scan", value -> {
+        scanRow.addView(makeSystemButton(activity, activity.getString(R.string.cheat_new_scan), () -> showValueInputDialog(activity, activity.getString(R.string.cheat_first_scan_title), value -> {
             int count = scanner == null ? 0 : scanner.firstScan(value);
-            Toast.makeText(activity, "Found " + count, Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, activity.getString(R.string.cheat_found_format, count), Toast.LENGTH_SHORT).show();
             refreshAll.run();
         })), new LinearLayout.LayoutParams(0, host.dp(34), 1f));
         scanRow.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(8), 1));
-        scanRow.addView(makeSystemButton(activity, "Next Scan", () -> showValueInputDialog(activity, "Next Scan", value -> {
+        scanRow.addView(makeSystemButton(activity, activity.getString(R.string.cheat_next_scan), () -> showValueInputDialog(activity, activity.getString(R.string.cheat_next_scan), value -> {
             int count = scanner == null ? 0 : scanner.nextScan(value);
-            Toast.makeText(activity, "Filtered to " + count, Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, activity.getString(R.string.cheat_filtered_format, count), Toast.LENGTH_SHORT).show();
             refreshAll.run();
         })), new LinearLayout.LayoutParams(0, host.dp(34), 1f));
         root.addView(scanRow);
@@ -78,7 +78,7 @@ final class CheatsToolsViewBuilder {
         List<Integer> results = scanner == null ? java.util.Collections.emptyList() : scanner.getResults();
         if (!results.isEmpty()) {
             TextView resultsHeader = new TextView(activity);
-            resultsHeader.setText("Results (" + results.size() + "): Click to Copy");
+            resultsHeader.setText(activity.getString(R.string.cheat_results_header_format, results.size()));
             resultsHeader.setTextColor(Color.YELLOW);
             resultsHeader.setTextSize(11f);
             root.addView(resultsHeader);
@@ -94,7 +94,7 @@ final class CheatsToolsViewBuilder {
                 resultItem.setOnClickListener(v -> {
                     android.content.ClipboardManager cb = (android.content.ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                     cb.setPrimaryClip(android.content.ClipData.newPlainText("Address", String.format("0x%08X", addr)));
-                    Toast.makeText(activity, "Copied: 0x" + Integer.toHexString(addr), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, activity.getString(R.string.cheat_copied_format, Integer.toHexString(addr).toUpperCase()), Toast.LENGTH_SHORT).show();
                 });
                 resultsList.addView(resultItem);
             }
@@ -104,7 +104,7 @@ final class CheatsToolsViewBuilder {
         root.addView(new View(activity), new LinearLayout.LayoutParams(1, host.dp(12)));
 
         TextView title = new TextView(activity);
-        title.setText("Standard Cheats");
+        title.setText(activity.getString(R.string.cheat_standard_cheats));
         title.setTextColor(Color.WHITE);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextSize(14f);
@@ -125,7 +125,7 @@ final class CheatsToolsViewBuilder {
             List<CheatEntry> cheats = cheatManager.getCheats();
             if (cheats.isEmpty()) {
                 TextView empty = new TextView(activity);
-                empty.setText("No cheats yet.");
+                empty.setText(activity.getString(R.string.cheat_no_cheats));
                 empty.setTextColor(Color.GRAY);
                 empty.setGravity(Gravity.CENTER);
                 list.addView(empty);
@@ -173,7 +173,7 @@ final class CheatsToolsViewBuilder {
         reloadRef[0] = reload;
         reload.run();
 
-        TextView addButton = makeSystemButton(activity, "Add New Cheat", () -> showAddCheatDialog(activity, host, reload));
+        TextView addButton = makeSystemButton(activity, activity.getString(R.string.cheat_add_new), () -> showAddCheatDialog(activity, host, reload));
         root.addView(addButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(44)));
     }
 

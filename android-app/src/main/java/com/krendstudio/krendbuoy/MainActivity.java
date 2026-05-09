@@ -76,6 +76,11 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     }
 
     @Override
+    protected void attachBaseContext(android.content.Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -164,7 +169,7 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         folderTextBox.setOrientation(LinearLayout.VERTICAL);
         folderHeader.addView(folderTextBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView folderTitle = new TextView(this);
-        folderTitle.setText("Folder Control");
+        folderTitle.setText(getString(R.string.folder_control));
         folderTitle.setTextColor(Color.WHITE);
         folderTitle.setTypeface(Typeface.DEFAULT_BOLD);
         folderTitle.setTextSize(18f);
@@ -174,7 +179,7 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         folderPathView.setTextSize(14f);
         folderTextBox.addView(folderPathView);
         Button changeFolder = new Button(this);
-        changeFolder.setText("Change Folder");
+        changeFolder.setText(getString(R.string.change_folder));
         changeFolder.setOnClickListener(v -> openSaveFolderPicker());
         folderHeader.addView(changeFolder, new LinearLayout.LayoutParams(dp(144), ViewGroup.LayoutParams.WRAP_CONTENT));
         emptyView = new TextView(this);
@@ -302,13 +307,19 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     }
 
     private void showSortDialog() {
-        String[] labels = {"Last Played", "Name A → Z", "Name Z → A", "Save State Count", "Recently Added"};
-        new AlertDialog.Builder(this).setTitle("Sort ROM List").setSingleChoiceItems(labels, sortMode, (dialog, which) -> {
+        String[] labels = {
+                getString(R.string.sort_last_played),
+                getString(R.string.sort_name_asc),
+                getString(R.string.sort_name_desc),
+                getString(R.string.sort_state_count),
+                getString(R.string.sort_recently_added)
+        };
+        new AlertDialog.Builder(this).setTitle(getString(R.string.sort_rom_list)).setSingleChoiceItems(labels, sortMode, (dialog, which) -> {
             sortMode = which;
             prefs.edit().putInt(KEY_SORT_MODE, sortMode).apply();
             dialog.dismiss();
             refreshRomList();
-        }).setNegativeButton("Cancel", null).show();
+        }).setNegativeButton(android.R.string.cancel, null).show();
     }
 
     private void openSaveFolderPicker() {
@@ -323,16 +334,16 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         if (folderPathView == null || romList == null || emptyView == null) return;
         romList.removeAllViews();
         if (selectedSaveFolderUri == null) {
-            folderPathView.setText("No folder selected");
+            folderPathView.setText(getString(R.string.no_folder_selected));
             emptyView.setVisibility(View.VISIBLE);
-            emptyView.setText("Choose a Save / ROM folder first. ROM files must be inside that folder.");
+            emptyView.setText(getString(R.string.choose_save_rom_folder));
             return;
         }
         folderPathView.setText(displayFolderPath(selectedSaveFolderUri));
         ArrayList<RomEntry> entries = scanRomEntries();
         if (entries.isEmpty()) {
             emptyView.setVisibility(View.VISIBLE);
-            emptyView.setText("No .gba, .gbc, or .gb files found in this folder.");
+            emptyView.setText(getString(R.string.no_rom_files_found));
             return;
         }
         emptyView.setVisibility(View.GONE);
@@ -364,7 +375,7 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
                 }
             }
         } catch (Throwable t) {
-            showNotice("ROM List Failed", t.getMessage() == null ? "Could not list selected folder." : t.getMessage());
+            showNotice(getString(R.string.rom_list_failed_title), t.getMessage() == null ? getString(R.string.rom_list_failed_default) : t.getMessage());
         }
         sortRomEntries(entries);
         return entries;
@@ -418,12 +429,12 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         chips.setOrientation(LinearLayout.HORIZONTAL);
         chips.setGravity(Gravity.LEFT);
         chips.setPadding(0, dp(8), 0, 0);
-        chips.addView(chip(entry.hasSav ? "SAV FOUND" : "NO SAV", entry.hasSav));
-        chips.addView(chip(entry.stateCount > 0 ? "STATE x" + entry.stateCount : "NO STATE", entry.stateCount > 0));
-        if (entry.favorite) chips.addView(chip("PINNED", true));
+        chips.addView(chip(entry.hasSav ? getString(R.string.sav_found) : getString(R.string.no_sav), entry.hasSav));
+        chips.addView(chip(entry.stateCount > 0 ? getString(R.string.state_count_format, entry.stateCount) : getString(R.string.no_state), entry.stateCount > 0));
+        if (entry.favorite) chips.addView(chip(getString(R.string.pinned), true));
         card.addView(chips);
         TextView meta = new TextView(this);
-        meta.setText("Last played: " + (entry.lastPlayed > 0 ? formatTimestamp(entry.lastPlayed) : "Never"));
+        meta.setText(getString(R.string.last_played_format, (entry.lastPlayed > 0 ? formatTimestamp(entry.lastPlayed) : getString(R.string.common_never))));
         meta.setTextColor(Color.rgb(176, 187, 204));
         meta.setTextSize(13f);
         meta.setPadding(0, dp(8), 0, 0);
@@ -432,8 +443,14 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     }
 
     private void showRomActions(RomEntry entry) {
-        String favoriteLabel = entry.favorite ? "Unpin Favorite" : "Pin Favorite";
-        String[] items = {"Launch Game", "Load State Slot", favoriteLabel, "Show File Info", "Refresh Status"};
+        String favoriteLabel = entry.favorite ? getString(R.string.rom_action_unpin_favorite) : getString(R.string.rom_action_pin_favorite);
+        String[] items = {
+                getString(R.string.rom_action_launch_game),
+                getString(R.string.rom_action_load_state_slot),
+                favoriteLabel,
+                getString(R.string.rom_action_show_file_info),
+                getString(R.string.rom_action_refresh_status)
+        };
         new AlertDialog.Builder(this).setTitle(entry.name).setItems(items, (dialog, which) -> {
             if (which == 0) startGame(entry.uri, entry.baseName, 0);
             else if (which == 1) showLoadStateSlotDialog(entry);
@@ -446,13 +463,13 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     private void showLoadStateSlotDialog(RomEntry entry) {
         RomSessionManager romSessionManager = new RomSessionManager(this);
         SaveStateManager ssm = new SaveStateManager(this, selectedSaveFolderUri, romSessionManager.ensureDirectory("states"), entry.baseName);
-        StateDialogHelper.show(this, "Load State - " + entry.name, ssm, null, new StateDialogHelper.Callback() {
+        StateDialogHelper.show(this, getString(R.string.load_state_with_rom_format, entry.name), ssm, null, new StateDialogHelper.Callback() {
             @Override
             public void onSlotSelected(int slot) {
                 if (ssm.getModifiedTime(slot) > 0) {
                      startGame(entry.uri, entry.baseName, slot);
                 } else {
-                     showNotice("Load State", "No save state found in Slot " + slot + ".");
+                     showNotice(getString(R.string.load_state_notice_title), getString(R.string.no_save_state_in_slot_format, slot));
                 }
             }
 
@@ -486,8 +503,14 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
     }
 
     private void showRomFileInfo(RomEntry entry) {
-        String info = entry.name + "\n\nFavorite: " + (entry.favorite ? "YES" : "NO") + "\nSAV: " + (entry.hasSav ? "FOUND" : "MISSING") + "\nSTATE: " + entry.stateCount + "\nLast played: " + (entry.lastPlayed > 0 ? formatTimestamp(entry.lastPlayed) : "Never") + "\nFolder: " + displayFolderPath(selectedSaveFolderUri);
-        showNotice("File Info", info);
+        String info = getString(R.string.file_info_format,
+                entry.name,
+                (entry.favorite ? getString(R.string.common_yes) : getString(R.string.common_no)),
+                (entry.hasSav ? getString(R.string.common_found) : getString(R.string.common_missing)),
+                entry.stateCount,
+                (entry.lastPlayed > 0 ? formatTimestamp(entry.lastPlayed) : getString(R.string.common_never)),
+                displayFolderPath(selectedSaveFolderUri));
+        showNotice(getString(R.string.file_info_title), info);
     }
 
     private TextView chip(String text, boolean positive) {

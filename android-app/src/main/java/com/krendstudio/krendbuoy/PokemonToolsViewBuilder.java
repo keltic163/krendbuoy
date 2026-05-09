@@ -83,7 +83,13 @@ final class PokemonToolsViewBuilder {
             tabs.setBackgroundColor(0x33000000);
             tabs.setPadding(host.dp(4), host.dp(4), host.dp(4), host.dp(4));
 
-            String[] pocketNames = {"Items", "Balls", "Key", "TM", "Berry"};
+            String[] pocketNames = {
+                    activity.getString(R.string.pokemon_pocket_items),
+                    activity.getString(R.string.pokemon_pocket_balls),
+                    activity.getString(R.string.pokemon_pocket_key),
+                    activity.getString(R.string.pokemon_pocket_tm),
+                    activity.getString(R.string.pokemon_pocket_berry)
+            };
             PokemonConstants.Pocket[] pocketTypes = {
                     PokemonConstants.Pocket.ITEMS,
                     PokemonConstants.Pocket.BALLS,
@@ -111,7 +117,7 @@ final class PokemonToolsViewBuilder {
             root.addView(hsv);
 
             TextView pocketTitle = new TextView(activity);
-            pocketTitle.setText("Pocket: " + sCurrentPocket.name());
+            pocketTitle.setText(activity.getString(R.string.pokemon_pocket_format, sCurrentPocket.name()));
             pocketTitle.setTextColor(Color.WHITE);
             pocketTitle.setPadding(0, host.dp(8), 0, host.dp(4));
             pocketTitle.setTextSize(13f);
@@ -120,7 +126,7 @@ final class PokemonToolsViewBuilder {
             List<PokemonConstants.ItemSlot> items = pm.getBagItems(sCurrentPocket);
             if (items.isEmpty()) {
                 TextView empty = new TextView(activity);
-                empty.setText("Empty or not loaded.");
+                empty.setText(activity.getString(R.string.pokemon_bag_empty));
                 empty.setTextColor(Color.GRAY);
                 empty.setPadding(0, host.dp(8), 0, host.dp(8));
                 root.addView(empty);
@@ -150,9 +156,9 @@ final class PokemonToolsViewBuilder {
                         in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
                         in.setText(String.valueOf(item.count));
                         new AlertDialog.Builder(activity)
-                                .setTitle("Edit: " + pm.getItemName(item.id))
+                                .setTitle(activity.getString(R.string.pokemon_bag_edit_item_format, pm.getItemName(item.id)))
                                 .setView(in)
-                                .setPositiveButton("Set", (d, w) -> {
+                                .setPositiveButton(activity.getString(R.string.pokemon_bag_set), (d, w) -> {
                                     try {
                                         pm.setBagItem(item.index, item.id, Integer.parseInt(in.getText().toString()), item.pocket);
                                         refreshAll.run();
@@ -166,13 +172,13 @@ final class PokemonToolsViewBuilder {
                 root.addView(list);
             }
 
-            root.addView(makeSystemButton(activity, "Add to " + sCurrentPocket.name(), () -> showAddItemDialog(activity, pm, refreshAll)),
+            root.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_bag_add_to_pocket_format, sCurrentPocket.name()), () -> showAddItemDialog(activity, pm, refreshAll)),
                     new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(40)));
         } else {
             TextView info = new TextView(activity);
             info.setText(pm.getEffectiveVersion() == PokemonConstants.GameVersion.UNKNOWN
-                    ? "Set Pokemon version, then locate Trainer to edit Bag."
-                    : "Locate Trainer first to edit Bag.");
+                    ? activity.getString(R.string.pokemon_trainer_locate_locate_first)
+                    : activity.getString(R.string.pokemon_trainer_locate_trainer_first));
             info.setTextColor(Color.GRAY);
             root.addView(info);
         }
@@ -183,7 +189,7 @@ final class PokemonToolsViewBuilder {
         if (pm == null) return;
 
         TextView title = new TextView(activity);
-        title.setText("Pokemon Tools & Debugger");
+        title.setText(activity.getString(R.string.pokemon_tools_debugger));
         title.setTextColor(Color.rgb(61, 155, 235));
         title.setTypeface(null, Typeface.BOLD);
         title.setTextSize(14f);
@@ -193,10 +199,10 @@ final class PokemonToolsViewBuilder {
         PokemonConstants.GameVersion autoVersion = pm.detectVersion();
         PokemonConstants.GameVersion effectiveVersion = pm.getEffectiveVersion();
         String versionText = pm.isManualVersionSelected()
-                ? "Version: Manual " + pm.getManualVersion() + " | Auto: " + autoVersion
-                : "Version: Auto " + effectiveVersion;
+                ? activity.getString(R.string.pokemon_version_manual_format, pm.getManualVersion(), autoVersion)
+                : activity.getString(R.string.pokemon_version_auto_format, effectiveVersion);
         if (effectiveVersion == PokemonConstants.GameVersion.UNKNOWN) {
-            versionText += "\nUnknown ROM. Please set version manually.";
+            versionText += "\n" + activity.getString(R.string.pokemon_version_unknown_note);
         }
         versionInfo.setText(versionText);
         versionInfo.setTextColor(effectiveVersion == PokemonConstants.GameVersion.UNKNOWN ? Color.YELLOW : Color.LTGRAY);
@@ -211,29 +217,31 @@ final class PokemonToolsViewBuilder {
 
         TextView moneyView = new TextView(activity);
         int money = pm.getMoney();
-        moneyView.setText("Money: $" + (money == -1 ? "???" : money));
+        String moneyLabel = pm.isMoneyLocked() 
+                ? activity.getString(R.string.pokemon_money_locked_format, money)
+                : activity.getString(R.string.pokemon_money_format, (money == -1 ? 0 : money));
+        moneyView.setText(moneyLabel);
         moneyView.setTextColor(pm.isMoneyLocked() ? Color.CYAN : Color.YELLOW);
         moneyView.setTextSize(16f);
         moneyRow.addView(moneyView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         if (pm.isMoneyLocked()) {
-            moneyRow.addView(makeSystemButton(activity, "Unlock", () -> {
+            moneyRow.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_money_unlock), () -> {
                 pm.unlockMoney();
                 refreshAll.run();
             }), new LinearLayout.LayoutParams(host.dp(60), host.dp(34)));
             moneyRow.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
         }
 
-        moneyRow.addView(makeSystemButton(activity, "Edit", () -> showEditMoneyDialog(activity, host, pm, refreshAll)),
+        moneyRow.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_money_edit), () -> showEditMoneyDialog(activity, host, pm, refreshAll)),
                 new LinearLayout.LayoutParams(host.dp(60), host.dp(34)));
         root.addView(moneyRow);
 
         TextView debugText = new TextView(activity);
         byte[] raw = pm.readRawMoney();
         int rawValue = (raw != null && raw.length >= 4) ? ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN).getInt() : 0;
-        debugText.setText("Addr: " + String.format("0x%08X", pm.getMoneyAddress())
-                + " | Key: 0x" + Integer.toHexString(pm.findSecurityKey())
-                + "\nRaw: " + rawValue + " | Hex: " + bytesToHex(raw));
+        debugText.setText(activity.getString(R.string.pokemon_debug_addr_key_format, 
+                pm.getMoneyAddress(), pm.findSecurityKey(), rawValue, bytesToHex(raw)));
         debugText.setTextColor(Color.GREEN);
         debugText.setTextSize(10f);
         debugText.setTypeface(Typeface.MONOSPACE);
@@ -246,19 +254,19 @@ final class PokemonToolsViewBuilder {
         LinearLayout row1 = new LinearLayout(activity);
         row1.setOrientation(LinearLayout.HORIZONTAL);
         row1.setPadding(0, 0, 0, host.dp(8));
-        row1.addView(makeSystemButton(activity, "Scan Trainer", () -> showScanTrainerDialog(activity, host, pm, refreshAll)),
+        row1.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_tool_trainer_id_scan), () -> showScanTrainerDialog(activity, host, pm, refreshAll)),
                 new LinearLayout.LayoutParams(0, host.dp(32), 1f));
         controls.addView(row1);
 
         LinearLayout row2 = new LinearLayout(activity);
         row2.setOrientation(LinearLayout.HORIZONTAL);
-        row2.addView(makeSystemButton(activity, "Fix Security Key", () -> showFixSecurityKeyDialog(activity, pm, refreshAll)),
+        row2.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_tool_fix_security_key), () -> showFixSecurityKeyDialog(activity, pm, refreshAll)),
                 new LinearLayout.LayoutParams(0, host.dp(32), 1f));
         row2.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
-        row2.addView(makeSystemButton(activity, "Set Version", () -> showPokemonVersionDialog(activity, pm, refreshAll)),
+        row2.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_tool_set_version), () -> showPokemonVersionDialog(activity, pm, refreshAll)),
                 new LinearLayout.LayoutParams(0, host.dp(32), 1f));
         row2.addView(new View(activity), new LinearLayout.LayoutParams(host.dp(6), 1));
-        row2.addView(makeSystemButton(activity, "Auto Locate", () -> {
+        row2.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_tool_auto_locate), () -> {
             pm.autoLocateByPointers();
             refreshAll.run();
         }), new LinearLayout.LayoutParams(0, host.dp(32), 1f));
@@ -267,7 +275,7 @@ final class PokemonToolsViewBuilder {
 
         MemoryScanner ms = host.getMemoryScanner();
         CheckBox xorCb = new CheckBox(activity);
-        xorCb.setText("Memory Scanner XOR Mode (for encrypted values)");
+        xorCb.setText(activity.getString(R.string.pokemon_xor_mode));
         xorCb.setTextColor(Color.LTGRAY);
         xorCb.setTextSize(12f);
         xorCb.setChecked(ms != null && ms.isXorMode());
@@ -288,14 +296,14 @@ final class PokemonToolsViewBuilder {
         layout.addView(input);
 
         CheckBox lock = new CheckBox(activity);
-        lock.setText("Lock Money (Infinite)");
+        lock.setText(activity.getString(R.string.pokemon_lock_money_infinite));
         lock.setChecked(true);
         layout.addView(lock);
 
         new AlertDialog.Builder(activity)
-                .setTitle("Edit Money")
+                .setTitle(activity.getString(R.string.pokemon_dialog_edit_money))
                 .setView(layout)
-                .setPositiveButton("Set", (d, w) -> {
+                .setPositiveButton(activity.getString(R.string.pokemon_bag_set), (d, w) -> {
                     try {
                         int value = Integer.parseInt(input.getText().toString());
                         pm.setMoney(value);
@@ -310,33 +318,33 @@ final class PokemonToolsViewBuilder {
 
     private static void showScanTrainerDialog(Activity activity, Host host, PokemonManager pm, Runnable refreshAll) {
         android.widget.EditText input = new android.widget.EditText(activity);
-        input.setHint("Trainer ID (5 digits)");
+        input.setHint(activity.getString(R.string.pokemon_dialog_enter_trainer_id));
         input.setText(host.getSettingsManager().getLastTrainerId());
         new AlertDialog.Builder(activity)
-                .setTitle("Locate by Trainer ID")
-                .setMessage("Enter your 5-digit Trainer ID from the Trainer Card.")
+                .setTitle(activity.getString(R.string.pokemon_dialog_locate_by_id))
+                .setMessage(activity.getString(R.string.pokemon_dialog_trainer_id_msg))
                 .setView(input)
-                .setPositiveButton("Scan ID", (d, w) -> {
+                .setPositiveButton(activity.getString(R.string.pokemon_dialog_scan_id), (d, w) -> {
                     String value = input.getText().toString().trim();
                     host.getSettingsManager().setLastTrainerId(value);
                     if (value.matches("\\d+")) {
                         int found = pm.scanForTrainerID(Integer.parseInt(value));
                         if (found != 0) {
-                            Toast.makeText(activity, "Found Trainer at 0x" + Integer.toHexString(found), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, activity.getString(R.string.cheat_copied_format, Integer.toHexString(found).toUpperCase()), Toast.LENGTH_SHORT).show();
                             refreshAll.run();
                         } else {
-                            Toast.makeText(activity, "ID not found in RAM", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_id_not_found), Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
-                .setNeutralButton("Scan Name", (d, w) -> {
+                .setNeutralButton(activity.getString(R.string.pokemon_dialog_scan_name), (d, w) -> {
                     String value = input.getText().toString().trim();
                     int found = pm.scanForTrainerName(value);
                     if (found != 0) {
-                        Toast.makeText(activity, "Found Name at 0x" + Integer.toHexString(found), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, activity.getString(R.string.cheat_copied_format, Integer.toHexString(found).toUpperCase()), Toast.LENGTH_SHORT).show();
                         refreshAll.run();
                     } else {
-                        Toast.makeText(activity, "Name not found", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_name_not_found), Toast.LENGTH_SHORT).show();
                     }
                 })
                 .show();
@@ -344,20 +352,20 @@ final class PokemonToolsViewBuilder {
 
     private static void showFixSecurityKeyDialog(Activity activity, PokemonManager pm, Runnable refreshAll) {
         android.widget.EditText input = new android.widget.EditText(activity);
-        input.setHint("Current Money Amount");
+        input.setHint(activity.getString(R.string.pokemon_dialog_enter_exact_money));
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         new AlertDialog.Builder(activity)
-                .setTitle("Fix Decryption Key")
-                .setMessage("If money/items look wrong, enter your EXACT current money amount to recalculate the Security Key.")
+                .setTitle(activity.getString(R.string.pokemon_dialog_fix_key_title))
+                .setMessage(activity.getString(R.string.pokemon_dialog_fix_key_msg))
                 .setView(input)
-                .setPositiveButton("Fix Key", (d, w) -> {
+                .setPositiveButton(activity.getString(R.string.pokemon_bag_set), (d, w) -> {
                     try {
                         int amount = Integer.parseInt(input.getText().toString().trim());
                         pm.scanByExactMoney(amount);
                         refreshAll.run();
                     } catch (Exception ignored) {}
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
@@ -365,25 +373,25 @@ final class PokemonToolsViewBuilder {
         List<PokemonConstants.ItemInfo> common = pm.getCommonItems(sCurrentPocket);
         String[] names = new String[common.size() + 1];
         for (int i = 0; i < common.size(); i++) names[i] = common.get(i).name;
-        names[common.size()] = "Custom ID...";
+        names[common.size()] = activity.getString(R.string.pokemon_dialog_custom_id);
 
         new AlertDialog.Builder(activity)
-                .setTitle("Add to " + sCurrentPocket.name())
+                .setTitle(activity.getString(R.string.pokemon_bag_add_to_pocket_format, sCurrentPocket.name()))
                 .setItems(names, (d, which) -> {
                     if (which < common.size()) {
                         PokemonConstants.ItemInfo info = common.get(which);
                         showQuantityDialog(activity, pm, info.id, info.name, info.pocket, refresh);
                     } else {
                         android.widget.EditText input = new android.widget.EditText(activity);
-                        input.setHint("Item ID");
+                        input.setHint(activity.getString(R.string.pokemon_dialog_item_id_hint));
                         new AlertDialog.Builder(activity)
-                                .setTitle("Enter ID")
+                                .setTitle(activity.getString(R.string.pokemon_dialog_enter_id))
                                 .setView(input)
-                                .setPositiveButton("Next", (d2, w2) -> {
+                                .setPositiveButton(activity.getString(R.string.common_ok), (d2, w2) -> {
                                     try {
                                         String value = input.getText().toString().trim();
                                         int id = value.startsWith("0x") ? Integer.parseInt(value.substring(2), 16) : Integer.parseInt(value);
-                                        showQuantityDialog(activity, pm, id, "Item #" + id, sCurrentPocket, refresh);
+                                        showQuantityDialog(activity, pm, id, activity.getString(R.string.pokemon_item_name_fallback_format, id), sCurrentPocket, refresh);
                                     } catch (Exception ignored) {}
                                 })
                                 .show();
@@ -397,31 +405,31 @@ final class PokemonToolsViewBuilder {
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         input.setText("10");
         new AlertDialog.Builder(activity)
-                .setTitle("Quantity for " + name)
+                .setTitle(activity.getString(R.string.pokemon_dialog_quantity_for_format, name))
                 .setView(input)
-                .setPositiveButton("Add", (d, w) -> {
+                .setPositiveButton(activity.getString(R.string.pokemon_dialog_add), (d, w) -> {
                     try {
                         int count = Integer.parseInt(input.getText().toString());
                         if (pm.addBagItem(id, count, pocket)) {
-                            Toast.makeText(activity, "Added " + name, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_added_format, name), Toast.LENGTH_SHORT).show();
                             refresh.run();
                         } else {
-                            Toast.makeText(activity, "Pocket is full or not available!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_pocket_full), Toast.LENGTH_SHORT).show();
                         }
                     } catch (Exception ignored) {}
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
     private static void showPokemonVersionDialog(Activity activity, PokemonManager pm, Runnable refreshAll) {
         String[] labels = {
-                "Auto Detect",
-                "FireRed",
-                "LeafGreen",
-                "Ruby",
-                "Sapphire",
-                "Emerald / Glazed"
+                activity.getString(R.string.pokemon_version_auto),
+                activity.getString(R.string.pokemon_version_firered),
+                activity.getString(R.string.pokemon_version_leafgreen),
+                activity.getString(R.string.pokemon_version_ruby),
+                activity.getString(R.string.pokemon_version_sapphire),
+                activity.getString(R.string.pokemon_version_emerald)
         };
 
         PokemonConstants.GameVersion[] versions = {
@@ -434,19 +442,19 @@ final class PokemonToolsViewBuilder {
         };
 
         new AlertDialog.Builder(activity)
-                .setTitle("Set Pokemon Version")
+                .setTitle(activity.getString(R.string.pokemon_dialog_set_version_title))
                 .setItems(labels, (dialog, which) -> {
                     PokemonConstants.GameVersion selected = versions[which];
                     if (selected == PokemonConstants.GameVersion.UNKNOWN) {
                         pm.clearManualVersion();
-                        Toast.makeText(activity, "Version set to Auto Detect", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_version_set_auto), Toast.LENGTH_SHORT).show();
                     } else {
                         pm.setVersion(selected);
-                        Toast.makeText(activity, "Version set to " + selected, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, activity.getString(R.string.pokemon_dialog_version_set_format, labels[which]), Toast.LENGTH_SHORT).show();
                     }
                     refreshAll.run();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 

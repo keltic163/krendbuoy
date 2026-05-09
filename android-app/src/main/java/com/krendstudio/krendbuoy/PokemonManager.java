@@ -3,7 +3,9 @@ package com.krendstudio.krendbuoy;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import com.krendstudio.krendbuoy.PokemonConstants.*;
 
 public class PokemonManager {
@@ -15,6 +17,9 @@ public class PokemonManager {
     private GameVersion manualVersion = GameVersion.UNKNOWN;
 
     private int offItems = 0, offKey = 0, offBalls = 0, offTM = 0, offBerries = 0;
+
+    private final Map<Integer, String> itemNameCache = new HashMap<>();
+    private boolean namesLoaded = false;
 
     public void setVersion(GameVersion version) {
         manualVersion = version == null ? GameVersion.UNKNOWN : version;
