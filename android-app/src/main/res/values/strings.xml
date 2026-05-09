@@ -24,16 +24,10 @@
     <string name="settings_display_settings">Display Settings</string>
     <string name="settings_controller_settings">Controller Settings</string>
     <string name="settings_screen_scaling">Screen Scaling</string>
-    <string name="display_fit_screen">Fit Screen</string>
-    <string name="display_original_ratio">Original Ratio</string>
+    <string name="display_auto_fit">Auto Fit</string>
+    <string name="display_integer_scale">Integer Scale</string>
     <string name="display_stretch">Stretch</string>
-    <string name="display_pixel_perfect">Pixel Perfect (2x)</string>
-    <string name="settings_screen_brightness">Screen Brightness</string>
-    <string name="brightness_brightest">Brightest (100%)</string>
-    <string name="brightness_bright">Bright (80%)</string>
-    <string name="brightness_medium">Medium (60%)</string>
-    <string name="brightness_dim">Dim (40%)</string>
-    <string name="settings_color_correction">Color Correction</string>
+    <string name="settings_color_mode">Color Mode</string>
     <string name="settings_screen_border">Screen Border</string>
     <string name="settings_show_debug_info">Show Debug Info (FPS)</string>
 

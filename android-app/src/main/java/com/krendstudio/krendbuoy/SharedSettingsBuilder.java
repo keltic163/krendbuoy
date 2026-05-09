@@ -73,10 +73,9 @@ final class SharedSettingsBuilder {
         
         root.addView(makeSettingButton(activity, activity.getString(R.string.settings_screen_scaling), () -> {
             String[] labels = {
-                    activity.getString(R.string.display_fit_screen),
-                    activity.getString(R.string.display_original_ratio),
-                    activity.getString(R.string.display_stretch),
-                    activity.getString(R.string.display_pixel_perfect)
+                    activity.getString(R.string.display_auto_fit),
+                    activity.getString(R.string.display_integer_scale),
+                    activity.getString(R.string.display_stretch)
             };
             new AlertDialog.Builder(activity)
                     .setTitle(activity.getString(R.string.settings_screen_scaling))
@@ -87,24 +86,8 @@ final class SharedSettingsBuilder {
                     }).show();
         }), blockParams(activity, 0, 8, 0, 12));
 
-        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_screen_brightness), () -> {
-            String[] labels = {
-                    activity.getString(R.string.brightness_brightest),
-                    activity.getString(R.string.brightness_bright),
-                    activity.getString(R.string.brightness_medium),
-                    activity.getString(R.string.brightness_dim)
-            };
-            new AlertDialog.Builder(activity)
-                    .setTitle(activity.getString(R.string.settings_screen_brightness))
-                    .setSingleChoiceItems(labels, sm.getBgDimmingLevel(), (dialog, which) -> {
-                        sm.setBgDimmingLevel(which);
-                        host.onSettingChanged();
-                        dialog.dismiss();
-                    }).show();
-        }), blockParams(activity, 0, 0, 0, 12));
-
-        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_color_correction), sm.isColorCorrectionEnabled(), enabled -> {
-            sm.setColorCorrectionEnabled(enabled);
+        root.addView(makeSettingToggle(activity, activity.getString(R.string.settings_color_mode), sm.isColorModeEnabled(), enabled -> {
+            sm.setColorModeEnabled(enabled);
             host.onSettingChanged();
         }), blockParams(activity, 0, 0, 0, 12));
         

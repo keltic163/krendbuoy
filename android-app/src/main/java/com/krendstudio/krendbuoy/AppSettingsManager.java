@@ -11,10 +11,9 @@ final class AppSettingsManager {
     static final int AUDIO_2048 = 2048;
     static final int AUDIO_4096 = 4096;
 
-    static final int DISPLAY_FIT = 0;
-    static final int DISPLAY_ORIGINAL_RATIO = 1;
-    static final int DISPLAY_STRETCH = 2;
-    static final int DISPLAY_PIXEL_PERFECT = 3;
+    static final int SCALE_AUTO_FIT = 0;
+    static final int SCALE_INTEGER = 1;
+    static final int SCALE_STRETCH = 2;
 
     static final int THEME_DEFAULT = 0;
     static final int LANGUAGE_SYSTEM = 0;
@@ -24,8 +23,7 @@ final class AppSettingsManager {
     private static final String KEY_AUDIO_PRESET = "audio_preset";
     private static final String KEY_DISPLAY_MODE = "display_mode";
     private static final String KEY_DEBUG_TEXT_VISIBLE = "debug_text_visible";
-    private static final String KEY_COLOR_CORRECTION = "color_correction";
-    private static final String KEY_BG_DIMMING = "bg_dimming";
+    private static final String KEY_COLOR_MODE = "color_mode";
     private static final String KEY_SCREEN_BORDER = "screen_border";
     private static final String KEY_THEME = "interface_theme";
     private static final String KEY_LANGUAGE = "language_mode";
@@ -53,28 +51,20 @@ final class AppSettingsManager {
     }
 
     int getDisplayMode() {
-        int value = prefs.getInt(KEY_DISPLAY_MODE, DISPLAY_FIT);
-        return value == DISPLAY_ORIGINAL_RATIO || value == DISPLAY_STRETCH ? value : DISPLAY_FIT;
+        int value = prefs.getInt(KEY_DISPLAY_MODE, SCALE_AUTO_FIT);
+        return (value >= SCALE_AUTO_FIT && value <= SCALE_STRETCH) ? value : SCALE_AUTO_FIT;
     }
 
     void setDisplayMode(int value) {
         prefs.edit().putInt(KEY_DISPLAY_MODE, value).apply();
     }
 
-    boolean isColorCorrectionEnabled() {
-        return prefs.getBoolean(KEY_COLOR_CORRECTION, true);
+    boolean isColorModeEnabled() {
+        return prefs.getBoolean(KEY_COLOR_MODE, true);
     }
 
-    void setColorCorrectionEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_COLOR_CORRECTION, enabled).apply();
-    }
-
-    int getBgDimmingLevel() {
-        return prefs.getInt(KEY_BG_DIMMING, 0); // 0: None, 1: Low, 2: Mid, 3: High
-    }
-
-    void setBgDimmingLevel(int level) {
-        prefs.edit().putInt(KEY_BG_DIMMING, level).apply();
+    void setColorModeEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_COLOR_MODE, enabled).apply();
     }
 
     boolean isScreenBorderEnabled() {
@@ -196,10 +186,9 @@ final class AppSettingsManager {
     }
 
     static String displayModeLabel(android.content.Context context, int value) {
-        if (value == DISPLAY_ORIGINAL_RATIO) return context.getString(R.string.display_original_ratio);
-        if (value == DISPLAY_STRETCH) return context.getString(R.string.display_stretch);
-        if (value == DISPLAY_PIXEL_PERFECT) return context.getString(R.string.display_pixel_perfect);
-        return context.getString(R.string.display_fit_screen);
+        if (value == SCALE_INTEGER) return context.getString(R.string.display_integer_scale);
+        if (value == SCALE_STRETCH) return context.getString(R.string.display_stretch);
+        return context.getString(R.string.display_auto_fit);
     }
 
     static String themeLabel(android.content.Context context, int value) {

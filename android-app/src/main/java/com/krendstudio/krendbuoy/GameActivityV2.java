@@ -46,17 +46,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private int audioBacklogSamples = AppSettingsManager.AUDIO_DYNAMIC;
     private Uri portableSaveFolderUri;
     private String romBaseName = "selected";
-    private int displayMode = AppSettingsManager.DISPLAY_FIT;
+    private int displayMode = AppSettingsManager.SCALE_AUTO_FIT;
     private boolean debugTextVisible = false;
-    private boolean colorCorrectionEnabled = true;
-    private int bgDimmingLevel = 0;
+    private boolean colorModeEnabled = true;
     private boolean screenBorderEnabled = false;
     private int startupLoadStateSlot = 0;
     private SaveStateManager saveStateManager;
     private CheatManager cheatManager;
     private PokemonManager pokemonManager;
     private MemoryScanner memoryScanner;
-    private FrameLayout dimOverlay;
     private View screenBorder;
     
     // Performance optimization for state slots
@@ -77,8 +75,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         audioBacklogSamples = settingsManager.getAudioPreset();
         displayMode = settingsManager.getDisplayMode();
         debugTextVisible = settingsManager.isDebugTextVisible();
-        colorCorrectionEnabled = settingsManager.isColorCorrectionEnabled();
-        bgDimmingLevel = settingsManager.getBgDimmingLevel();
+        colorModeEnabled = settingsManager.isColorModeEnabled();
         screenBorderEnabled = settingsManager.isScreenBorderEnabled();
         pokemonManager = new PokemonManager();
         memoryScanner = new MemoryScanner();
@@ -125,15 +122,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         screenBorder.setVisibility(screenBorderEnabled ? View.VISIBLE : View.GONE);
         screenBox.addView(screenBorder, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        dimOverlay = new FrameLayout(this);
-        dimOverlay.setBackgroundColor(Color.TRANSPARENT);
-        // dimOverlay will be added later to control Z-order
-        
         applyDisplayMode();
-
-        // Important: dimOverlay should be ABOVE content but BELOW GameControllerOverlay
-        root.addView(dimOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        updateDimOverlay();
 
         GameControllerOverlay.attach(this, root, this);
         setContentView(root);
@@ -435,8 +424,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         pauseEmulationForMenu();
         String[] sections = {
                 getString(R.string.settings_screen_scaling),
-                getString(R.string.settings_color_correction),
-                getString(R.string.settings_screen_brightness),
+                getString(R.string.settings_color_mode),
                 getString(R.string.settings_screen_border),
                 getString(R.string.settings_show_debug_info)
         };
@@ -444,10 +432,9 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .setTitle(getString(R.string.settings_display_settings))
                 .setItems(sections, (dialog, which) -> {
                     if (which == 0) showScalingDialog();
-                    else if (which == 1) toggleColorCorrection();
-                    else if (which == 2) showDimmingDialog();
-                    else if (which == 3) toggleScreenBorder();
-                    else if (which == 4) toggleDebugText();
+                    else if (which == 1) toggleColorMode();
+                    else if (which == 2) toggleScreenBorder();
+                    else if (which == 3) toggleDebugText();
                 })
                 .setNegativeButton(android.R.string.cancel, (dialog, which) -> resumeEmulationFromMenu())
                 .setOnCancelListener(dialog -> resumeEmulationFromMenu())
@@ -456,10 +443,9 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     private void showScalingDialog() {
         String[] labels = {
-                getString(R.string.display_fit_screen),
-                getString(R.string.display_original_ratio),
-                getString(R.string.display_stretch),
-                getString(R.string.display_pixel_perfect)
+                getString(R.string.display_auto_fit),
+                getString(R.string.display_integer_scale),
+                getString(R.string.display_stretch)
         };
         new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.settings_screen_scaling))
@@ -473,47 +459,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
                 .show();
     }
 
-    private void toggleColorCorrection() {
-        colorCorrectionEnabled = !colorCorrectionEnabled;
-        settingsManager.setColorCorrectionEnabled(colorCorrectionEnabled);
-        showToast(getString(R.string.settings_color_correction) + ": " + (colorCorrectionEnabled ? getString(R.string.common_on) : getString(R.string.common_off)));
+    private void toggleColorMode() {
+        colorModeEnabled = !colorModeEnabled;
+        settingsManager.setColorModeEnabled(colorModeEnabled);
+        showToast(getString(R.string.settings_color_mode) + ": " + (colorModeEnabled ? getString(R.string.common_on) : getString(R.string.common_off)));
         resumeEmulationFromMenu();
-    }
-
-    private void showDimmingDialog() {
-        String[] labels = {
-                getString(R.string.brightness_brightest),
-                getString(R.string.brightness_bright),
-                getString(R.string.brightness_medium),
-                getString(R.string.brightness_dim)
-        };
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.settings_screen_brightness))
-                .setSingleChoiceItems(labels, bgDimmingLevel, (dialog, which) -> {
-                    bgDimmingLevel = which;
-                    settingsManager.setBgDimmingLevel(bgDimmingLevel);
-                    updateDimOverlay();
-                    dialog.dismiss();
-                    resumeEmulationFromMenu();
-                })
-                .show();
-    }
-
-    private void updateDimOverlay() {
-        if (dimOverlay == null) return;
-        dimOverlay.setVisibility(bgDimmingLevel > 0 ? View.VISIBLE : View.GONE);
-        dimOverlay.removeAllViews();
-        if (bgDimmingLevel > 0) {
-            View dimView = new View(this);
-            dimView.setBackgroundColor(Color.BLACK);
-            dimView.setAlpha(getDimAlpha(bgDimmingLevel));
-            dimOverlay.addView(dimView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            
-            // Allow clicks to pass through dimOverlay to the content/controller below
-            // Note: dimOverlay is a FrameLayout, setting clickable(false) on dimView
-            dimView.setClickable(false);
-            dimOverlay.setClickable(false);
-        }
     }
 
     private void toggleScreenBorder() {
@@ -528,13 +478,6 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         settingsManager.setDebugTextVisible(debugTextVisible);
         info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
         resumeEmulationFromMenu();
-    }
-
-    private float getDimAlpha(int level) {
-        if (level == 1) return 0.2f;
-        if (level == 2) return 0.4f;
-        if (level == 3) return 0.6f;
-        return 0.0f;
     }
 
     @Override
@@ -578,7 +521,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void applyDisplayMode() {
-        if (displayMode == AppSettingsManager.DISPLAY_PIXEL_PERFECT) {
+        if (displayMode == AppSettingsManager.SCALE_INTEGER) {
             screen.setAdjustViewBounds(true);
             screen.setScaleType(ImageView.ScaleType.CENTER);
             // GBA is 240x160. 2x is 480x320.
@@ -587,8 +530,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             lp.height = dp(320);
             screen.setLayoutParams(lp);
         } else {
-            screen.setAdjustViewBounds(displayMode != AppSettingsManager.DISPLAY_STRETCH);
-            screen.setScaleType(displayMode == AppSettingsManager.DISPLAY_STRETCH ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
+            screen.setAdjustViewBounds(displayMode != AppSettingsManager.SCALE_STRETCH);
+            screen.setScaleType(displayMode == AppSettingsManager.SCALE_STRETCH ? ImageView.ScaleType.FIT_XY : ImageView.ScaleType.FIT_CENTER);
             ViewGroup.LayoutParams lp = screen.getLayoutParams();
             lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
             lp.height = ViewGroup.LayoutParams.MATCH_PARENT;

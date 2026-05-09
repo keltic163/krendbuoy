@@ -24,16 +24,10 @@
     <string name="settings_display_settings">顯示設定</string>
     <string name="settings_controller_settings">控制器設定</string>
     <string name="settings_screen_scaling">畫面縮放</string>
-    <string name="display_fit_screen">符合螢幕</string>
-    <string name="display_original_ratio">原始比例</string>
+    <string name="display_auto_fit">自動符合</string>
+    <string name="display_integer_scale">整數縮放</string>
     <string name="display_stretch">拉伸填滿</string>
-    <string name="display_pixel_perfect">像素精準（2x）</string>
-    <string name="settings_screen_brightness">畫面亮度</string>
-    <string name="brightness_brightest">最亮（100%）</string>
-    <string name="brightness_bright">明亮（80%）</string>
-    <string name="brightness_medium">中等（60%）</string>
-    <string name="brightness_dim">昏暗（40%）</string>
-    <string name="settings_color_correction">色彩校正</string>
+    <string name="settings_color_mode">色彩模式</string>
     <string name="settings_screen_border">畫面邊框</string>
     <string name="settings_show_debug_info">顯示除錯資訊（FPS）</string>
 
@@ -42,7 +36,7 @@
     <string name="settings_controller_skin_format">控制器外觀：%1$s</string>
     <string name="settings_select_skin_style">選擇外觀樣式</string>
     <string name="settings_select_skin_format">選擇外觀：樣式 %1$02d</string>
-    <string name="skin_style_01">樣式 01（原始）</string>
+    <string name="skin_style_01">樣式 01（預設）</string>
     <string name="skin_style_02">樣式 02</string>
     <string name="skin_style_03">樣式 03</string>
     <string name="settings_button_size_default">按鍵大小：預設</string>
@@ -63,20 +57,20 @@
     <string name="quick_menu_restart_game">重新啟動遊戲</string>
     <string name="quick_menu_return_main_menu">返回主選單</string>
 
-    <string name="save_state_title">儲存狀態</string>
-    <string name="load_state_title">讀取狀態</string>
-    <string name="load_state_with_rom_format">讀取狀態 - %1$s</string>
-    <string name="overwrite_save_state_title">覆蓋儲存狀態</string>
-    <string name="overwrite_save_state_message_format">Slot %1$d 已有儲存狀態。\n%2$s\n\n要覆蓋嗎？</string>
+    <string name="save_state_title">儲存即時存檔</string>
+    <string name="load_state_title">讀取即時存檔</string>
+    <string name="load_state_with_rom_format">讀取即時存檔 - %1$s</string>
+    <string name="overwrite_save_state_title">覆蓋儲存即時存檔</string>
+    <string name="overwrite_save_state_message_format">Slot %1$d 已有儲存即時存檔。\n%2$s\n\n要覆蓋嗎？</string>
     <string name="overwrite">覆蓋</string>
     <string name="slot_empty_format">Slot %1$d 是空的</string>
     <string name="save_state_saved_format">已儲存 Slot %1$d</string>
-    <string name="save_state_write_failed">儲存狀態寫入失敗</string>
-    <string name="save_state_failed_format">儲存狀態失敗：%1$s</string>
+    <string name="save_state_write_failed">儲存即時存檔寫入失敗</string>
+    <string name="save_state_failed_format">儲存即時存檔失敗：%1$s</string>
     <string name="load_state_loaded_format">已讀取 Slot %1$d</string>
-    <string name="load_state_failed">讀取狀態失敗</string>
-    <string name="load_state_failed_format">讀取狀態失敗：%1$s</string>
-    <string name="no_save_state_in_slot_format">Slot %1$d 沒有儲存狀態。</string>
+    <string name="load_state_failed">讀取即時存檔失敗</string>
+    <string name="load_state_failed_format">讀取即時存檔失敗：%1$s</string>
+    <string name="no_save_state_in_slot_format">Slot %1$d 沒有即時存檔。</string>
     <string name="auto_save_loading">自動儲存（讀取中...）</string>
     <string name="slot_loading_format">Slot %1$d（讀取中...）</string>
 
@@ -91,7 +85,7 @@
     <string name="sort_last_played">最後遊玩</string>
     <string name="sort_name_asc">名稱 A → Z</string>
     <string name="sort_name_desc">名稱 Z → A</string>
-    <string name="sort_state_count">儲存狀態數量</string>
+    <string name="sort_state_count">儲存即時存檔數量</string>
     <string name="sort_recently_added">最近新增</string>
     <string name="rom_action_launch_game">啟動遊戲</string>
     <string name="rom_action_load_state_slot">讀取狀態 Slot</string>
@@ -108,8 +102,8 @@
     <string name="folder_required_message">開始遊戲前，請先選擇存檔 / ROM 資料夾。</string>
     <string name="sav_found">找到 SAV</string>
     <string name="no_sav">沒有 SAV</string>
-    <string name="state_count_format">狀態 x%1$d</string>
-    <string name="no_state">沒有狀態</string>
+    <string name="state_count_format">即時存檔 x%1$d</string>
+    <string name="no_state">沒有即時存檔</string>
     <string name="pinned">已釘選</string>
     <string name="last_played_format">最後遊玩：%1$s</string>
     <string name="file_info_format">%1$s\n\n最愛：%2$s\nSAV：%3$s\nSTATE：%4$d\n最後遊玩：%5$s\n資料夾：%6$s</string>
@@ -186,7 +180,7 @@
     <string name="pokemon_dialog_scan">掃描</string>
     <string name="pokemon_dialog_enter_trainer_name">輸入訓練家名稱 (英文)：</string>
     <string name="pokemon_dialog_enter_exact_money">輸入確切金錢數量：</string>
-    <string name="pokemon_dialog_fix_security_key_msg">這將嘗試修復部分改版 (如 Glazed) 使用的加密金鑰。\n\n是否繼續？</string>
+    <string name="pokemon_dialog_fix_security_key_msg">這將嘗試修復部分改版使用的加密金鑰。\n\n是否繼續？</string>
     <string name="pokemon_dialog_item_id_hint">道具 ID (十六或十進位)</string>
     <string name="pokemon_dialog_quantity_hint">數量 (1-999)</string>
     <string name="pokemon_dialog_add">新增</string>
