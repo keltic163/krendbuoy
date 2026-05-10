@@ -56,7 +56,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private MemoryScanner memoryScanner;
     private View screenBorder;
     
-    // Performance optimization for state slots
+    // Performance optimization and Seamless Resumption
+    private static byte[] sInstantStateCache = null;
     private final Map<Integer, Bitmap> thumbnailCache = new HashMap<>();
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
 
@@ -80,6 +81,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         memoryScanner = new MemoryScanner();
         startupLoadStateSlot = getIntent().getIntExtra("load_state_slot", 0);
         if (startupLoadStateSlot < 1 || startupLoadStateSlot > SaveStateManager.SLOT_COUNT) startupLoadStateSlot = 0;
+        getIntent().removeExtra("load_state_slot"); // One-time use
         String saveFolder = getIntent().getStringExtra("save_folder_uri");
         if (saveFolder != null && !saveFolder.isEmpty()) portableSaveFolderUri = Uri.parse(saveFolder);
         portableSaveManager = new PortableSaveManager(this, portableSaveFolderUri, this);
@@ -146,6 +148,14 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        try {
+            sInstantStateCache = NativeBridge.exportState();
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
     protected void onDestroy() {
         if (frameLoopManager != null) frameLoopManager.stop();
         NativeBridge.saveSram();
@@ -177,7 +187,15 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         importPortableSramIfAvailable();
         cheatManager.applyToCore();
         if (pokemonManager != null) pokemonManager.detectVersion();
-        loadStartupStateIfRequested();
+        
+        if (sInstantStateCache != null) {
+            NativeBridge.importState(sInstantStateCache);
+            sInstantStateCache = null;
+            updateInfo("Resumed from memory cache");
+        } else {
+            loadStartupStateIfRequested();
+        }
+
         updateInfo("Running... speed " + emulationSpeedLabel() + " audio preset " + AppSettingsManager.audioPresetLabel(this, audioBacklogSamples) + "\n" + NativeBridge.getLastError());
         menuPaused = false;
         restarting = false;

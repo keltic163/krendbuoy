@@ -14,7 +14,6 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 /**
  * Shared logic to build the settings UI for both MainActivity and GameActivity.
@@ -57,12 +56,8 @@ final class SharedSettingsBuilder {
                     .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                         sm.setLanguageMode(values[which]);
                         dialog.dismiss();
-                        if (activity instanceof GameActivityV2) {
-                            Toast.makeText(activity, activity.getString(R.string.language_game_apply_later), Toast.LENGTH_SHORT).show();
-                        } else {
-                            LocaleHelper.applyTo(activity);
-                            activity.recreate();
-                        }
+                        LocaleHelper.applyTo(activity);
+                        activity.recreate();
                     })
                     .setNegativeButton(android.R.string.cancel, null)
                     .show();
