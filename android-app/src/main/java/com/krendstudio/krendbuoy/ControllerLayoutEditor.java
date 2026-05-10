@@ -91,7 +91,7 @@ final class ControllerLayoutEditor {
         controls.addView(OverlayUiFactory.makeSystemButton(activity, "Cancel", () -> stop(panel, dpadView, actionButtons, useSkin, switchToSettings)),
                 new LinearLayout.LayoutParams(buttonWidth, buttonHeight));
 
-        panel.addView(controls, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(60), Gravity.BOTTOM));
+        panel.addView(controls, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(60), Gravity.TOP));
         sEditControlsOverlay = controls;
     }
 

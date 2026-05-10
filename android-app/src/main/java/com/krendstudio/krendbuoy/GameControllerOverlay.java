@@ -125,6 +125,10 @@ final class GameControllerOverlay {
             sActionButtons.addAll(actionButtons);
 
             panel.setOnTouchListener((view, event) -> {
+                if (ControllerLayoutEditor.isEditing()) {
+                    ControllerLayoutEditor.handleTouch(event, sDpadView, sActionButtons);
+                    return true;
+                }
                 updateDpad(sDpadView, dpadState, event);
                 updateVirtualButtons(actionButtons, event);
                 return true;
