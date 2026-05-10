@@ -563,8 +563,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             int scaleH = boxH / 160;
             int finalScale = Math.max(1, Math.min(scaleW, scaleH));
 
-            screen.setAdjustViewBounds(true);
-            screen.setScaleType(ImageView.ScaleType.CENTER);
+            screen.setAdjustViewBounds(false); // We set exact size
+            screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
             ViewGroup.LayoutParams lp = screen.getLayoutParams();
             lp.width = 240 * finalScale;
