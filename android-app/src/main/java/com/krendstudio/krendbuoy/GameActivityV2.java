@@ -117,28 +117,35 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     }
 
     private void updateSystemUi(boolean landscape) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            android.view.WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                if (landscape) {
-                    controller.hide(android.view.WindowInsets.Type.statusBars());
-                    controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                } else {
-                    controller.show(android.view.WindowInsets.Type.statusBars());
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                android.view.Window window = getWindow();
+                if (window == null) return;
+                android.view.WindowInsetsController controller = window.getInsetsController();
+                if (controller != null) {
+                    if (landscape) {
+                        controller.hide(android.view.WindowInsets.Type.statusBars());
+                        controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    } else {
+                        controller.show(android.view.WindowInsets.Type.statusBars());
+                    }
                 }
-            }
-        } else {
-            // Legacy implementation
-            View decorView = getWindow().getDecorView();
-            int flags = decorView.getSystemUiVisibility();
-            if (landscape) {
-                flags |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
             } else {
-                flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
-                flags &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                // Legacy implementation
+                android.view.Window window = getWindow();
+                if (window == null) return;
+                View decorView = window.getDecorView();
+                if (decorView == null) return;
+                int flags = decorView.getSystemUiVisibility();
+                if (landscape) {
+                    flags |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                } else {
+                    flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
+                    flags &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                }
+                decorView.setSystemUiVisibility(flags);
             }
-            decorView.setSystemUiVisibility(flags);
-        }
+        } catch (Throwable ignored) {}
     }
 
     @Override
