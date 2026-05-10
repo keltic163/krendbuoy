@@ -84,6 +84,7 @@ final class GameControllerOverlay {
 
         panel.post(() -> {
             int w = panel.getWidth(), h = panel.getHeight(); if (w <= 0 || h <= 0) return;
+            AppSettingsManager sm = host.getSettingsManager();
             int dpadSize = Math.min(sideWidth - host.dp(16), host.dp(160));
             int actionSize = Math.round(sideWidth * 0.45f);
             int shoulderWidth = Math.round(sideWidth * 0.45f), shoulderHeight = host.dp(40);
@@ -91,15 +92,15 @@ final class GameControllerOverlay {
 
             // Left Side: D-pad and Select
             sDpadView = makeDpadPad(activity, host, dpadSize);
-            OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, sideWidth / 2f, h * 0.70f);
-            addActionButton(activity, panel, actionButtons, "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, sideWidth / 2f, h * 0.90f, 10);
+            OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, w * sm.getButtonPosX(NativeBridge.BUTTON_UP, true, sideWidth / 2f / w), h * sm.getButtonPosY(NativeBridge.BUTTON_UP, true, 0.60f));
+            addActionButton(activity, panel, actionButtons, "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_SELECT, true, sideWidth / 2f / w), h * sm.getButtonPosY(NativeBridge.BUTTON_SELECT, true, 0.90f), 10);
 
             // Right Side: L/R, A/B, Start
-            addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w - sideWidth * 0.75f, h * 0.25f, 10);
-            addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w - sideWidth * 0.25f, h * 0.25f, 10);
-            addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, actionSize, w - sideWidth * 0.65f, h * 0.65f, actionSize / 2);
-            addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, actionSize, w - sideWidth * 0.30f, h * 0.50f, actionSize / 2);
-            addActionButton(activity, panel, actionButtons, "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w - sideWidth / 2f, h * 0.90f, 10);
+            addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_L, true, (w - sideWidth * 0.75f) / w), h * sm.getButtonPosY(NativeBridge.BUTTON_L, true, 0.25f), 10);
+            addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_R, true, (w - sideWidth * 0.25f) / w), h * sm.getButtonPosY(NativeBridge.BUTTON_R, true, 0.25f), 10);
+            addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_B, true, (w - sideWidth * 0.75f) / w), h * sm.getButtonPosY(NativeBridge.BUTTON_B, true, 0.65f), actionSize / 2);
+            addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_A, true, (w - sideWidth * 0.25f) / w), h * sm.getButtonPosY(NativeBridge.BUTTON_A, true, 0.50f), actionSize / 2);
+            addActionButton(activity, panel, actionButtons, "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_START, true, (w - sideWidth / 2f) / w), h * sm.getButtonPosY(NativeBridge.BUTTON_START, true, 0.90f), 10);
             
             sActionButtons.addAll(actionButtons);
 
@@ -158,14 +159,14 @@ final class GameControllerOverlay {
         int startSelectWidth = Math.round(w * 0.15f), startSelectHeight = host.dp(30), navHeight = host.dp(60);
         List<View> controllerViews = new ArrayList<>(), cheatsViews = new ArrayList<>(), pokemonViews = new ArrayList<>(), settingsViews = new ArrayList<>(), navButtons = new ArrayList<>();
 
-        float dpadX = sm.getButtonPosX(NativeBridge.BUTTON_UP, 0.255f), dpadY = sm.getButtonPosY(NativeBridge.BUTTON_UP, 0.52f);
+        float dpadX = sm.getButtonPosX(NativeBridge.BUTTON_UP, false, 0.255f), dpadY = sm.getButtonPosY(NativeBridge.BUTTON_UP, false, 0.52f);
         sDpadView = makeDpadPad(activity, host, dpadSize); OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, w * dpadX, h * dpadY); controllerViews.add(sDpadView);
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_L, 0.62f), h * sm.getButtonPosY(NativeBridge.BUTTON_L, 0.30f), 10));
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_R, 0.86f), h * sm.getButtonPosY(NativeBridge.BUTTON_R, 0.30f), 10));
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "B", NativeBridge.BUTTON_B, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_B, 0.657f), h * sm.getButtonPosY(NativeBridge.BUTTON_B, 0.595f), actionSize / 2));
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "A", NativeBridge.BUTTON_A, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_A, 0.857f), h * sm.getButtonPosY(NativeBridge.BUTTON_A, 0.485f), actionSize / 2));
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_SELECT, 0.415f), h * sm.getButtonPosY(NativeBridge.BUTTON_SELECT, 0.77f), 10));
-        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_START, 0.585f), h * sm.getButtonPosY(NativeBridge.BUTTON_START, 0.77f), 10));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_L, false, 0.62f), h * sm.getButtonPosY(NativeBridge.BUTTON_L, false, 0.30f), 10));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_R, false, 0.86f), h * sm.getButtonPosY(NativeBridge.BUTTON_R, false, 0.30f), 10));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "B", NativeBridge.BUTTON_B, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_B, false, 0.657f), h * sm.getButtonPosY(NativeBridge.BUTTON_B, false, 0.595f), actionSize / 2));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "A", NativeBridge.BUTTON_A, actionSize, actionSize, w * sm.getButtonPosX(NativeBridge.BUTTON_A, false, 0.857f), h * sm.getButtonPosY(NativeBridge.BUTTON_A, false, 0.485f), actionSize / 2));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_SELECT, false, 0.415f), h * sm.getButtonPosY(NativeBridge.BUTTON_SELECT, false, 0.77f), 10));
+        controllerViews.add(addActionButton(activity, panel, actionButtons, sUseSkin ? "" : "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w * sm.getButtonPosX(NativeBridge.BUTTON_START, false, 0.585f), h * sm.getButtonPosY(NativeBridge.BUTTON_START, false, 0.77f), 10));
         sActionButtons.addAll(actionButtons);
 
         View cheatsView = CheatsToolsViewBuilder.build(activity, new CheatsToolsViewBuilder.Host() {
@@ -219,11 +220,13 @@ final class GameControllerOverlay {
     }
 
     private static void startEditing(FrameLayout panel, List<View> controllerViews, List<View> cheatsViews, List<View> pokemonViews, List<View> settingsViews, List<View> navButtons, Host host) {
+        boolean landscape = panel.getContext().getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         ControllerLayoutEditor.start(
                 panel,
                 sDpadView,
                 sActionButtons,
                 sUseSkin,
+                landscape,
                 new ControllerLayoutEditor.Host() {
                     @Override public int dp(int value) { return host.dp(value); }
                     @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }

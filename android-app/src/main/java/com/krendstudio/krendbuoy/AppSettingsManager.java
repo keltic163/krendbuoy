@@ -38,6 +38,8 @@ final class AppSettingsManager {
     private static final String KEY_CONTROLLER_SKIN_ID = "controller_skin_id";
     private static final String KEY_BTN_X_PREFIX = "btn_x_";
     private static final String KEY_BTN_Y_PREFIX = "btn_y_";
+    private static final String KEY_BTN_X_LAND_PREFIX = "btn_x_l_";
+    private static final String KEY_BTN_Y_LAND_PREFIX = "btn_y_l_";
     private static final String KEY_LAST_TRAINER_ID = "last_trainer_id";
 
     private final SharedPreferences prefs;
@@ -143,16 +145,20 @@ final class AppSettingsManager {
         prefs.edit().putInt(KEY_CONTROLLER_SKIN_ID, id).apply();
     }
 
-    float getButtonPosX(int buttonId, float def) {
-        return prefs.getFloat(KEY_BTN_X_PREFIX + buttonId, def);
+    float getButtonPosX(int buttonId, boolean landscape, float def) {
+        String key = (landscape ? KEY_BTN_X_LAND_PREFIX : KEY_BTN_X_PREFIX) + buttonId;
+        return prefs.getFloat(key, def);
     }
 
-    float getButtonPosY(int buttonId, float def) {
-        return prefs.getFloat(KEY_BTN_Y_PREFIX + buttonId, def);
+    float getButtonPosY(int buttonId, boolean landscape, float def) {
+        String key = (landscape ? KEY_BTN_Y_LAND_PREFIX : KEY_BTN_Y_PREFIX) + buttonId;
+        return prefs.getFloat(key, def);
     }
 
-    void setButtonPos(int buttonId, float x, float y) {
-        prefs.edit().putFloat(KEY_BTN_X_PREFIX + buttonId, x).putFloat(KEY_BTN_Y_PREFIX + buttonId, y).apply();
+    void setButtonPos(int buttonId, boolean landscape, float x, float y) {
+        String xKey = (landscape ? KEY_BTN_X_LAND_PREFIX : KEY_BTN_X_PREFIX) + buttonId;
+        String yKey = (landscape ? KEY_BTN_Y_LAND_PREFIX : KEY_BTN_Y_PREFIX) + buttonId;
+        prefs.edit().putFloat(xKey, x).putFloat(yKey, y).apply();
     }
 
     String getLastTrainerId() {

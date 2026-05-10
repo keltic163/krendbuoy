@@ -131,12 +131,10 @@ final class SharedSettingsBuilder {
         }), blockParams(activity, 0, 0, 0, 24));
 
         // Layout Editor - Only show if the host provides a valid edit action
-        if (activity instanceof GameActivityV2) {
-            root.addView(sectionTitle(activity, activity.getString(R.string.settings_layout)));
-            root.addView(makeSettingButton(activity, activity.getString(R.string.settings_edit_controller_layout), () -> {
-                host.onEditLayout();
-            }), blockParams(activity, 0, 8, 0, 24));
-        }
+        root.addView(sectionTitle(activity, activity.getString(R.string.settings_layout)));
+        root.addView(makeSettingButton(activity, activity.getString(R.string.settings_edit_controller_layout), () -> {
+            host.onEditLayout();
+        }), blockParams(activity, 0, 8, 0, 24));
 
         // Audio Settings Section
         root.addView(sectionTitle(activity, activity.getString(R.string.settings_audio_preset)));

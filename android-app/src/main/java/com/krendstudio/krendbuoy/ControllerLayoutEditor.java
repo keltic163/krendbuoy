@@ -52,6 +52,7 @@ final class ControllerLayoutEditor {
             View dpadView,
             List<? extends ButtonBinding> actionButtons,
             boolean useSkin,
+            boolean landscape,
             Host host,
             Runnable switchToController,
             Runnable switchToSettings
@@ -78,7 +79,7 @@ final class ControllerLayoutEditor {
         Activity activity = (Activity) panel.getContext();
 
         controls.addView(OverlayUiFactory.makeSystemButton(activity, "Save", () -> {
-            saveLayout(panel, dpadView, actionButtons, host);
+            saveLayout(panel, dpadView, actionButtons, landscape, host);
             stop(panel, dpadView, actionButtons, useSkin, switchToSettings);
         }), new LinearLayout.LayoutParams(buttonWidth, buttonHeight));
         controls.addView(new View(panel.getContext()), new LinearLayout.LayoutParams(host.dp(12), 1));
@@ -162,6 +163,7 @@ final class ControllerLayoutEditor {
             FrameLayout panel,
             View dpadView,
             List<? extends ButtonBinding> actionButtons,
+            boolean landscape,
             Host host
     ) {
         float width = panel.getWidth();
@@ -169,13 +171,13 @@ final class ControllerLayoutEditor {
         if (width <= 0 || height <= 0) return;
 
         AppSettingsManager settings = host.getSettingsManager();
-        settings.setButtonPos(NativeBridge.BUTTON_UP,
+        settings.setButtonPos(NativeBridge.BUTTON_UP, landscape,
                 (dpadView.getLeft() + dpadView.getWidth() / 2f) / width,
                 (dpadView.getTop() + dpadView.getHeight() / 2f) / height);
 
         for (ButtonBinding button : actionButtons) {
             View view = button.getView();
-            settings.setButtonPos(button.getButton(),
+            settings.setButtonPos(button.getButton(), landscape,
                     (view.getLeft() + view.getWidth() / 2f) / width,
                     (view.getTop() + view.getHeight() / 2f) / height);
         }
