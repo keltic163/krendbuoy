@@ -19,7 +19,10 @@ public class PokemonManager {
     private int offItems = 0, offKey = 0, offBalls = 0, offTM = 0, offBerries = 0;
 
     private final Map<Integer, String> itemNameCache = new HashMap<>();
+    private final Map<Integer, String> speciesNameCache = new HashMap<>();
     private boolean namesLoaded = false;
+    private boolean speciesLoaded = false;
+    private String gameCode = "";
 
     public void setVersion(GameVersion version) {
         manualVersion = version == null ? GameVersion.UNKNOWN : version;
@@ -58,12 +61,13 @@ public class PokemonManager {
 
         if (b1 != null && b1.length == 4) {
             saveBlock1Addr = ByteBuffer.wrap(b1).order(ByteOrder.LITTLE_ENDIAN).getInt();
-            moneyAddress = (saveBlock1Addr >= 0x02000000) ? saveBlock1Addr + (rse ? 0x490 : 0x290) : 0;
+            if (saveBlock1Addr >= 0x02000000 && saveBlock1Addr <= 0x02048000) {
+                moneyAddress = saveBlock1Addr + (rse ? 0x490 : 0x290);
+            }
         }
         if (b2 != null && b2.length == 4) {
             saveBlock2Addr = ByteBuffer.wrap(b2).order(ByteOrder.LITTLE_ENDIAN).getInt();
             if (saveBlock2Addr >= 0x02000000) {
-                // 嘗試搜尋金鑰
                 scanForKeyHeuristically();
             }
         }
@@ -72,56 +76,75 @@ public class PokemonManager {
     }
 
     private void scanForKeyHeuristically() {
-        if (!usesSecurityKey(getEffectiveVersion())) {
+        GameVersion v = getEffectiveVersion();
+        if (!usesSecurityKey(v)) {
             securityKey = 0;
             return;
         }
-        if (moneyAddress == 0) return;
-        byte[] mData = readRawMoney();
-        if (mData == null) return;
-        int rawM = ByteBuffer.wrap(mData).order(ByteOrder.LITTLE_ENDIAN).getInt();
-
-        // 在 SaveBlock2 數據區搜尋能解密出合理金額的 32-bit 數值
-        byte[] data = NativeBridge.readMemory(saveBlock2Addr, 4000);
-        if (data == null) return;
-        ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < data.length - 4; i += 4) {
-            int key = bb.getInt(i);
-            if (key == 0) continue;
-            int dec = rawM ^ key;
-            if (dec >= 0 && dec <= 1000000 && key != rawM) {
+        
+        // Priority 1: Standard offset in SaveBlock2 (most stable)
+        int stdKeyOff = usesRseLayout(v) ? 0x0AF8 : 0x0AC4;
+        byte[] stdKeyData = NativeBridge.readMemory(saveBlock2Addr + stdKeyOff, 4);
+        if (stdKeyData != null) {
+            int key = ByteBuffer.wrap(stdKeyData).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            if (key != 0) {
                 this.securityKey = key;
                 return;
             }
         }
-        // 保底
-        byte[] kb = NativeBridge.readMemory(saveBlock2Addr + 0xAC4, 4);
-        if (kb != null) securityKey = ByteBuffer.wrap(kb).order(ByteOrder.LITTLE_ENDIAN).getInt();
+
+        // Priority 2: Scan for key based on money
+        if (moneyAddress != 0) {
+            byte[] mData = readRawMoney();
+            if (mData != null) {
+                int rawM = ByteBuffer.wrap(mData).order(ByteOrder.LITTLE_ENDIAN).getInt();
+                byte[] data = NativeBridge.readMemory(saveBlock2Addr, 4000);
+                if (data != null) {
+                    ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+                    for (int i = 0; i < data.length - 4; i += 4) {
+                        int key = bb.getInt(i);
+                        int dec = rawM ^ key;
+                        if (dec >= 0 && dec <= 999999 && key != 0) {
+                            this.securityKey = key;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void calibratePockets(GameVersion v) {
         if (saveBlock1Addr == 0) return;
         boolean encrypted = usesSecurityKey(v) && securityKey != 0;
         int xorPart = securityKey & 0xFFFF;
-        byte[] data = NativeBridge.readMemory(saveBlock1Addr, 5000); // 釉色版範圍擴大
+        
+        // Dynamic scan with STRICT validation (Check sequence of 3 items to avoid money false positive)
+        byte[] data = NativeBridge.readMemory(saveBlock1Addr, 5000);
         if (data == null) return;
         ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
 
         offItems = 0; offKey = 0; offBalls = 0;
 
-        for (int i = 0x200; i < data.length - 8; i += 2) {
+        for (int i = 0x100; i < data.length - 12; i += 2) {
             int id = bb.getShort(i) & 0xFFFF;
-            int count = bb.getShort(i + 2) & 0xFFFF;
-            int dec = encrypted ? (count ^ xorPart) : count;
+            if (id >= 1 && id <= 0x176) {
+                int id2 = bb.getShort(i + 4) & 0xFFFF;
+                int id3 = bb.getShort(i + 8) & 0xFFFF;
+                if (id2 > 0 && id2 <= 0x200 && id3 > 0 && id3 <= 0x200) {
+                    int rawCount = bb.getShort(i + 2) & 0xFFFF;
+                    int dec = encrypted ? (rawCount ^ xorPart) : rawCount;
 
-            if (id >= 0x01 && id <= 0x0C && dec >= 1 && dec <= 99 && offBalls == 0) offBalls = i;
-            if (id >= 0x0D && id <= 0x60 && dec >= 1 && dec <= 999 && offItems == 0) offItems = i;
+                    if (id >= 0x01 && id <= 0x0C && dec >= 1 && dec <= 999 && offBalls == 0) offBalls = i;
+                    if (id >= 0x0D && id <= 0x60 && dec >= 1 && dec <= 999 && offItems == 0) offItems = i;
+                }
+            }
         }
 
         boolean rse = usesRseLayout(v);
         if (offItems == 0) offItems = rse ? 0x498 : 0x298;
-        if (offBalls == 0) offBalls = rse ? 0x5D8 : 0x360;
-        offKey = offBalls - 120; // 相對定位法
+        if (offBalls == 0) offBalls = rse ? 0x5D8 : 0x3B8;
+        offKey = offBalls - (rse ? 80 : 120);
         offTM = offBalls + (rse ? 0x40 : 0x34);
         offBerries = offTM + (rse ? 0x100 : 0xC8);
     }
@@ -171,11 +194,16 @@ public class PokemonManager {
         byte[] data = readRawMoney();
         if (data == null || data.length < 4) return -1;
         int raw = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).getInt();
-        if (usesSecurityKey(getEffectiveVersion()) && securityKey != 0) {
-            int dec = raw ^ securityKey;
-            if (dec >= 0 && dec <= 2000000) return dec;
+        
+        // Priority: Use derived security key
+        if (securityKey != 0) {
+            return raw ^ securityKey;
         }
-        return (raw >= 0 && raw <= 1000000) ? raw : -1;
+        
+        // Check if raw value itself is reasonable (unencrypted)
+        if (raw >= 0 && raw <= 1000000) return raw;
+        
+        return -1;
     }
 
     public boolean setMoney(int value) {
@@ -204,9 +232,7 @@ public class PokemonManager {
     public void scanByExactMoney(int amount) {
         byte[] mData = readRawMoney();
         if (mData != null && usesSecurityKey(getEffectiveVersion())) {
-            // 核心：利用真實金額與 Raw 數據直接算出 Security Key
             this.securityKey = ByteBuffer.wrap(mData).order(ByteOrder.LITTLE_ENDIAN).getInt() ^ amount;
-            // 算出 Key 後，全口袋立即同步重校準
             calibratePockets(getEffectiveVersion());
         }
     }
@@ -230,25 +256,18 @@ public class PokemonManager {
     private int findFirstEmptyPocketSlot(Pocket targetPocket) {
         GameVersion v = getEffectiveVersion();
         if (saveBlock1Addr == 0 || (usesSecurityKey(v) && securityKey == 0)) return -1;
-
         int off = getPocketOffset(targetPocket);
         int max = getPocketCapacity(v, targetPocket);
         if (off == 0 || max <= 0) return -1;
-
         byte[] data = NativeBridge.readMemory(saveBlock1Addr + off, max * 4);
         if (data == null) return -1;
-
         ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < max; i++) {
             int pos = i * 4;
             if (pos + 2 > data.length) break;
-
             int id = bb.getShort(pos) & 0xFFFF;
-            if (id == 0 || id == 0x116 || id == 0x169) {
-                return i;
-            }
+            if (id == 0 || id == 0x116 || id == 0x169) return i;
         }
-
         return -1;
     }
 
@@ -258,20 +277,20 @@ public class PokemonManager {
         if (saveBlock1Addr == 0 || (usesSecurityKey(v) && securityKey == 0)) return items;
         int xorPart = securityKey & 0xFFFF;
         int off = getPocketOffset(targetPocket);
-
         if (off == 0) return items;
         int max = getPocketCapacity(v, targetPocket);
         if (max <= 0) return items;
-
         byte[] data = NativeBridge.readMemory(saveBlock1Addr + off, max * 4);
         if (data == null) return items;
         ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        
         for (int i = 0; i < max; i++) {
             if (bb.remaining() < 4) break;
             int id = bb.getShort() & 0xFFFF;
             int rawC = bb.getShort() & 0xFFFF;
-            if (id == 0 || id > 1000 || id == 0x116 || id == 0x169) continue;
+            
+            if (id == 0 || id == 0x116 || id == 0x169) continue;
+            if (targetPocket == Pocket.BALLS && (id < 1 || id > 0x010)) continue;
+            if (id > 0x176) continue;
 
             int realC = (usesSecurityKey(v) && targetPocket != Pocket.KEY_ITEMS && id <= 0x100) ? (rawC ^ xorPart) : rawC;
             if (realC > 20000) realC = rawC;
@@ -283,13 +302,10 @@ public class PokemonManager {
     public boolean setBagItem(int slotIndex, int itemId, int count, Pocket p) {
         GameVersion v = getEffectiveVersion();
         if (saveBlock1Addr == 0 || (usesSecurityKey(v) && securityKey == 0)) return false;
-
         int off = getPocketOffset(p);
         if (off == 0) return false;
-
         int max = getPocketCapacity(v, p);
         if (slotIndex < 0 || slotIndex >= max) return false;
-
         int addr = saveBlock1Addr + off + (slotIndex * 4);
         int xorPart = securityKey & 0xFFFF;
         int toWrite = (usesSecurityKey(v) && p != Pocket.KEY_ITEMS && itemId <= 0x100) ? ((count & 0xFFFF) ^ xorPart) : count;
@@ -305,19 +321,162 @@ public class PokemonManager {
     }
 
     public List<ItemInfo> getCommonItems(Pocket p) { return PokemonConstants.getCommonItems(p); }
-    public String getItemName(int id) { return PokemonConstants.getItemName(id); }
+
+    public List<PokemonEntry> getParty() {
+        List<PokemonEntry> team = new ArrayList<>();
+        if (saveBlock2Addr == 0) return team;
+        GameVersion v = getEffectiveVersion();
+        int offset = usesRseLayout(v) ? 0x234 : 0x0034;
+        byte[] data = NativeBridge.readMemory(saveBlock2Addr + offset, 600);
+        if (data == null) return team;
+        for (int i = 0; i < 6; i++) {
+            byte[] pkmnRaw = new byte[100];
+            System.arraycopy(data, i * 100, pkmnRaw, 0, 100);
+            int pkmnAddr = saveBlock2Addr + offset + (i * 100);
+            PokemonEntry entry = new PokemonEntry(pkmnRaw, pkmnAddr);
+            if (entry.species != 0 && entry.species <= 412) team.add(entry);
+        }
+        return team;
+    }
+    
     public int findSecurityKey() { return securityKey; }
     public int getMoneyAddress() { return moneyAddress; }
     public byte[] readRawMoney() { return moneyAddress == 0 ? null : NativeBridge.readMemory(moneyAddress, 4); }
+
     public GameVersion detectVersion() {
-        byte[] data = NativeBridge.readMemory(0x080000A0, 12);
+        byte[] data = NativeBridge.readMemory(0x080000AC, 4); 
         if (data == null) return GameVersion.UNKNOWN;
-        String name = new String(data).toUpperCase();
-        if (name.contains("GLAZED") || name.contains("POKEMON EMER")) return GameVersion.EMERALD;
-        if (name.contains("POKEMON FIRE")) return GameVersion.FIRE_RED;
-        if (name.contains("POKEMON LEAF")) return GameVersion.LEAF_GREEN;
-        if (name.contains("POKEMON RUBY")) return GameVersion.RUBY;
-        if (name.contains("POKEMON SAPP")) return GameVersion.SAPPHIRE;
+        gameCode = new String(data).toUpperCase();
+        if (gameCode.startsWith("BPR")) return GameVersion.FIRE_RED;
+        if (gameCode.startsWith("BPG")) return GameVersion.LEAF_GREEN;
+        if (gameCode.startsWith("BPE")) return GameVersion.EMERALD;
+        if (gameCode.startsWith("AXV")) return GameVersion.RUBY;
+        if (gameCode.startsWith("AXP")) return GameVersion.SAPPHIRE;
+        byte[] nameData = NativeBridge.readMemory(0x080000A0, 16);
+        if (nameData != null) {
+            String name = new String(nameData).toUpperCase();
+            if (name.contains("GLAZED")) return GameVersion.EMERALD;
+        }
         return GameVersion.UNKNOWN;
+    }
+
+    public String getItemName(int id) {
+        if (id == 0) return "---";
+        
+        // Strategy: Use built-in official high-quality database (highest stability)
+        String dbName = PokemonConstants.getItemName(id);
+        if (!dbName.equals("未知道具")) {
+            return dbName;
+        }
+        
+        // Fallback to ROM text only for IDs outside the official range (Custom Hack items)
+        if (!namesLoaded) loadItemNamesFromRom();
+        String cached = itemNameCache.get(id);
+        return (cached != null) ? cached : "未知道具";
+    }
+
+    public String getSpeciesName(int id) {
+        if (id == 0) return "---";
+        if (!speciesLoaded) loadSpeciesNamesFromRom();
+        String cached = speciesNameCache.get(id);
+        return cached != null ? cached : "Species #" + id;
+    }
+
+    public String getPokemonNickname(PokemonEntry p) {
+        if (p == null) return "";
+        byte[] nickBytes = new byte[10];
+        System.arraycopy(p.getRawData(), 8, nickBytes, 0, 10);
+        String nick = decodeGbaText(nickBytes);
+        return (nick == null || nick.isEmpty()) ? getSpeciesName(p.species) : nick;
+    }
+
+    private void loadItemNamesFromRom() {
+        if (namesLoaded) return;
+        detectVersion(); // Ensure gameCode is current
+        int tableAddr = findTableBySignature(44, 1, 2, 3); // Signature: IDs 1, 2, 3 at offset 14
+        if (tableAddr == 0) return;
+        for (int i = 0; i < 512; i++) {
+            byte[] nameBytes = NativeBridge.readMemory(tableAddr + (i * 44), 14);
+            if (nameBytes == null) break;
+            if (i > 0 && nameBytes[0] == 0x00 && nameBytes[1] == 0x00) break;
+            String name = decodeGbaText(nameBytes);
+            if (name.length() >= 2) itemNameCache.put(i, name);
+        }
+        namesLoaded = true;
+    }
+
+    private void loadSpeciesNamesFromRom() {
+        if (speciesLoaded) return;
+        detectVersion();
+        // Species table: ID is NOT in the struct, it's just a sequence of 11-byte names
+        // Search by known base offsets based on gameCode
+        int tableAddr = 0;
+        if (gameCode.startsWith("BPR")) tableAddr = 0x08245EE0;
+        else if (gameCode.startsWith("BPG")) tableAddr = 0x08245EE0;
+        else if (gameCode.startsWith("BPE")) tableAddr = 0x083185C8;
+        else if (gameCode.startsWith("AXV")) tableAddr = 0x081F716C;
+        else if (gameCode.startsWith("AXP")) tableAddr = 0x081F716C;
+        
+        if (tableAddr == 0) return;
+        for (int i = 0; i < 412; i++) {
+            byte[] nameBytes = NativeBridge.readMemory(tableAddr + (i * 11), 11);
+            if (nameBytes == null) break;
+            if (i > 0 && nameBytes[0] == 0x00) break;
+            String name = decodeGbaText(nameBytes);
+            if (name.length() >= 2) speciesNameCache.put(i, name);
+        }
+        speciesLoaded = true;
+    }
+
+    private int findTableBySignature(int entrySize, int id1, int id2, int id3) {
+        int start = 0x08100000; // ROM space
+        int range = 0x00800000; // Search 8MB
+        byte[] data = NativeBridge.readMemory(start, range);
+        if (data == null) return 0;
+        for (int i = 0; i < data.length - (entrySize * 3); i += 4) {
+            int check1 = (data[i + 14] & 0xFF) | ((data[i + 15] & 0xFF) << 8);
+            if (check1 == id1) {
+                int check2 = (data[i + entrySize + 14] & 0xFF) | ((data[i + entrySize + 15] & 0xFF) << 8);
+                if (check2 == id2) {
+                    int check3 = (data[i + entrySize * 2 + 14] & 0xFF) | ((data[i + entrySize * 2 + 15] & 0xFF) << 8);
+                    if (check3 == id3) return start + i;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private String decodeGbaText(byte[] data) {
+        if (data == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < data.length; i++) {
+            int u = data[i] & 0xFF;
+            if (u == 0xFF) break;
+            
+            // Check for 2-byte Chinese lead byte (A1-FE)
+            if (u >= 0xA1 && u <= 0xFE && i + 1 < data.length) {
+                int u2 = data[i+1] & 0xFF;
+                if (u2 >= 0x40 && u2 <= 0xFE) {
+                    try {
+                        byte[] gbk = {(byte)u, (byte)u2};
+                        String s = new String(gbk, "GBK");
+                        sb.append(s);
+                        i++; continue;
+                    } catch (Exception ignored) {}
+                }
+            }
+            
+            // Standard Pokemon Latin encoding mapping
+            if (u == 0x00) { sb.append(" "); continue; }
+            if (u >= 0xBB && u <= 0xD4) { sb.append((char) ('A' + (u - 0xBB))); continue; }
+            if (u >= 0xD5 && u <= 0xEE) { sb.append((char) ('a' + (u - 0xD5))); continue; }
+            if (u >= 0xA1 && u <= 0xAA) { sb.append((char) ('0' + (u - 0xA1))); continue; }
+            if (u == 0xAB) sb.append("!");
+            if (u == 0xAC) sb.append("?");
+            if (u == 0xAD) sb.append(".");
+            if (u == 0xAE) sb.append("-");
+            if (u == 0x2D) sb.append("&");
+        }
+        return sb.toString().trim().replaceAll("[^\\p{L}\\p{N}\\p{P}\\p{Z}]", "");
     }
 }

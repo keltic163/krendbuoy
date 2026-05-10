@@ -3,67 +3,69 @@ package com.krendstudio.krendbuoy;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class PokemonConstants {
+public class PokemonConstants {
     public enum GameVersion { UNKNOWN, FIRE_RED, LEAF_GREEN, RUBY, SAPPHIRE, EMERALD }
     public enum Pocket { ITEMS, BALLS, KEY_ITEMS, BERRIES, TM_HM }
 
     public static class ItemSlot {
         public int id, count, index;
         public Pocket pocket;
-        public ItemSlot(int id, int count, int index, Pocket pocket) { 
-            this.id = id; this.count = count; this.index = index; this.pocket = pocket;
-        }
+        public ItemSlot(int id, int count, int index, Pocket p) { this.id = id; this.count = count; this.index = index; this.pocket = p; }
     }
 
     public static class ItemInfo {
-        public final int id; public final String name; public final Pocket pocket;
-        public ItemInfo(int id, String name, Pocket pocket) { 
-            this.id = id; this.name = name; this.pocket = pocket;
-        }
+        public int id; public String name; public Pocket pocket;
+        public ItemInfo(int id, String name, Pocket p) { this.id = id; this.name = name; this.pocket = p; }
     }
 
     public static String getItemName(int id) {
-        if (id == 0x116 || id == 0x169) return "CANCEL";
-        if (id >= 0x01 && id <= 0x0C) {
-            if (id == 0x01) return "Master Ball";
-            if (id == 0x02) return "Ultra Ball";
-            if (id == 0x03) return "Great Ball";
-            if (id == 0x04) return "Poke Ball";
-            return "Ball #" + id;
+        if (id >= 1 && id < OFFICIAL_ITEMS.length) {
+            String name = OFFICIAL_ITEMS[id];
+            if (!name.equals("---")) return name;
         }
-        switch(id) {
-            case 0x0D: return "Potion";
-            case 0x13: return "Full Restore";
-            case 0x19: return "Revive";
-            case 0x1A: return "Max Revive";
-            case 0x21: return "Full Heal";
-            case 0x44: return "Rare Candy";
-            case 0x4B: return "PP Up";
-            case 0x4C: return "PP Max";
-            case 0x53: return "Super Repel";
-            case 0xFE: return "Exp. Share";
-            case 0x103: return "Town Map";
-            case 0x10F: return "Old Rod";
-            case 0x110: return "Good Rod";
-            case 0x111: return "Super Rod";
-            default: return "Item #" + id;
-        }
+        return "未知道具";
     }
 
     public static List<ItemInfo> getCommonItems(Pocket p) {
         List<ItemInfo> list = new ArrayList<>();
         if (p == Pocket.BALLS) {
-            list.add(new ItemInfo(0x01, "Master Ball", Pocket.BALLS));
-            list.add(new ItemInfo(0x02, "Ultra Ball", Pocket.BALLS));
-            list.add(new ItemInfo(0x04, "Poke Ball", Pocket.BALLS));
+            list.add(new ItemInfo(0x001, getItemName(1), p));
+            list.add(new ItemInfo(0x002, getItemName(2), p));
+            list.add(new ItemInfo(0x004, getItemName(4), p));
         } else if (p == Pocket.ITEMS) {
-            list.add(new ItemInfo(0x44, "Rare Candy", Pocket.ITEMS));
-            list.add(new ItemInfo(0x13, "Full Restore", Pocket.ITEMS));
-            list.add(new ItemInfo(0xFE, "Exp. Share", Pocket.ITEMS));
-        } else if (p == Pocket.KEY_ITEMS) {
-            list.add(new ItemInfo(0x103, "Town Map", Pocket.KEY_ITEMS));
-            list.add(new ItemInfo(0x111, "Super Rod", Pocket.KEY_ITEMS));
+            list.add(new ItemInfo(0x00D, getItemName(13), p));
+            list.add(new ItemInfo(0x044, getItemName(68), p));
+            list.add(new ItemInfo(0x045, getItemName(69), p));
         }
         return list;
     }
+
+    // Official Gen 3 Item IDs (Aligned to Hex)
+    private static final String[] OFFICIAL_ITEMS = {
+        "---", // 0x00
+        "大師球", "高級球", "超級球", "精靈球", "狩獵球", "網紋球", "潛水球", "巢穴球", "重複球", "計時球", "豪華球", "紀念球", // 0x01-0x0C
+        "傷藥", "解毒藥", "解燒藥", "解凍藥", "解眠藥", "解麻藥", "全復藥", "全恢復", "厲害傷藥", "好傷藥", "萬靈藥", "活力碎片", "活力塊", // 0x0D-0x19
+        "美味之水", "勁爽汽水", "果汁牛奶", "哞哞鮮奶", "能量粉", "能量根", "萬能粉", "復活草", "ＰＰ單項小補給", "ＰＰ單項全補給", // 0x1A-0x23
+        "ＰＰ多項小補給", "ＰＰ多項全補給", "釜炎仙貝", "聖灰", "淺灘海鹽", "淺灘貝殼", "紅碎片", "藍碎片", "黃碎片", "綠碎片", // 0x24-0x2D
+        "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", // 0x2E-0x3E (Placeholders)
+        "ＨＰ提升", "蛋白質", "補鐵藥劑", "補碳藥劑", "補鈣藥劑", "神奇糖果", "ＰＰ提升", "補鋅藥劑", "ＰＰ極限提升", "---", // 0x3F-0x48 (0x44=Rare Candy)
+        "道具防禦", "擊中要害", "力量強化", "防禦強化", "速度強化", "特攻強化", "特防強化", "皮皮玩偶", "向尾喵尾巴", "---", // 0x49-0x52
+        "除蟲噴霧", "離洞繩", "除蟲噴霧", "---", "---", "---", "日之石", "月之石", "火之石", "雷之石", "水之石", "葉之石", // 0x53-0x62
+        "微型蘑菇", "大蘑菇", "---", "珍珠", "大珍珠", "星之碎片", "星星沙", "金珠", "心之鱗片", "---", // 0x63-0x6C
+        "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---", "---",
+        "橙色郵件", "港口郵件", "閃亮郵件", "機械郵件", "木木郵件", "波浪郵件", "珠寶郵件", "影子郵件", "熱帶郵件", "夢幻郵件", "奇蹟郵件", "復古郵件", // 0x79-0x84
+        "櫻子果", "零餘果", "桃桃果", "莓莓果", "利木果", "柿仔果", "句栗果", "納納果", "西梨果", "凰梨果", "玉黍果", "岳竹果", "甘露果", "羅子果", "芒芒果", "樂芭果", "芭亞果", "木瓜果", "蔓莓果", "墨莓果", "蕉香果", "西梨果", "梨柑果", "異奇果", "芒芒果", "樂芭果", "芭亞果", "木瓜果",
+        "巧可果", "千香果", "羅子果", "番荔果", "蓮蒲果", "通通果", "腰木果", "福祿果", "扁櫻果", "草蠶果", "林野果", "眼鏡蛇果", "刺耳果", "布理果", "嘉亞果", "嘉亞果", "辣椒果", // Berries 0x85-0xAF
+        "亮光粉", "白色香草", "競爭背心", "學習裝置", "先制之爪", "安撫之鈴", "精神草", "博識眼鏡", "絲綢圍巾", "節拍器", "黑色污泥", "不變之石", "焦點鏡", "木炭", "神秘水滴", "奇蹟種子", "黑帶", "黑眼鏡", "金屬膜", "軟沙", "硬石頭", "奇蹟種子", "龍之牙", "龍之鱗片", "安撫之鈴", "安撫之鈴",
+        "海潮薰香", "奇異薰香", "純潔薰香", "岩石薰香", "飽腹薰香", "花朵薰香", "幸運薰香", "慢條斯理薰香", "奇異動力", "銀粉", "護身金幣", "潔淨之符", "王者之證", "王者之符", "不變之石", "焦點鏡", "絲綢圍巾", "先制之爪", "安撫之鈴", "精神草", "木炭", "神秘水滴", "奇蹟種子", "黑帶", "黑眼鏡",
+        "招式學習器01", "招式學習器02", "招式學習器03", "招式學習器04", "招式學習器05", "招式學習器06", "招式學習器07", "招式學習器08", "招式學習器09", "招式學習器10",
+        "招式學習器11", "招式學習器12", "招式學習器13", "招式學習器14", "招式學習器15", "招式學習器16", "招式學習器17", "招式學習器18", "招式學習器19", "招式學習器20",
+        "招式學習器21", "招式學習器22", "招式學習器23", "招式學習器24", "招式學習器25", "招式學習器26", "招式學習器27", "招式學習器28", "招式學習器29", "招式學習器30",
+        "招式學習器31", "招式學習器32", "招式學習器33", "招式學習器34", "招式學習器35", "招式學習器36", "招式學習器37", "招式學習器38", "招式學習器39", "招式學習器40",
+        "招式學習器41", "招式學習器42", "招式學習器43", "招式學習器44", "招式學習器45", "招式學習器46", "招式學習器47", "招式學習器48", "招式學習器49", "招式學習器50",
+        "秘傳學習器01", "秘傳學習器02", "秘傳學習器03", "秘傳學習器04", "秘傳學習器05", "秘傳學習器06", "秘傳學習器07", "秘傳學習器08",
+        "---", "---",
+        "町地圖", "戰鬥搜尋器", "探測器", "舊釣竿", "好釣竿", "厲害釣竿", "船票", "華麗大賽通行證", "---", "吼吼鯨噴壺", "得文偵測鏡", "收集袋", "大木的包裹", "神奇寶貝笛", "神秘鑰匙", "自行車", "茶", "神秘琥珀", "秘密鑰匙", "自行車", "茶", "神秘琥珀", "秘密鑰匙", "自行車", "茶", "神秘琥珀",
+        "金屬粉", "貝殼之鈴", "海潮薰香", "奇異薰香", "純潔薰香", "岩石薰香", "飽腹薰香", "花朵薰香", "幸運薰香", "慢條斯理薰香", "奇異動力", "銀粉", "護身金幣", "潔淨之符", "王者之證", "王者之符", "不變之石", "焦點鏡", "絲綢圍巾"
+    };
 }

@@ -173,6 +173,7 @@
     <string name="pokemon_tool_unlock_money">Unlock Money</string>
     <string name="pokemon_tool_fix_security_key">Fix Security Key (Glazed/Hack)</string>
     <string name="pokemon_tool_set_version">Set Game Version</string>
+    <string name="pokemon_tool_refresh">Refresh Data</string>
     <string name="pokemon_trainer_located_format">Trainer located at: 0x%1$08X</string>
     <string name="pokemon_trainer_not_found">Trainer not found.</string>
     <string name="pokemon_money_format">Money: %1$d</string>
@@ -193,4 +194,11 @@
     <string name="pokemon_version_ruby">Ruby</string>
     <string name="pokemon_version_sapphire">Sapphire</string>
     <string name="pokemon_version_emerald">Emerald</string>
+    <string name="pokemon_team">Current Team</string>
+    <string name="pokemon_stats">Stats</string>
+    <string name="pokemon_iv_ev">IVs / EVs</string>
+    <string name="pokemon_moves">Moves</string>
+    <string name="pokemon_personality">Personality</string>
+    <string name="pokemon_shiny">Shiny</string>
+    <string name="pokemon_edit_title_format">Edit %1$s</string>
 </resources>

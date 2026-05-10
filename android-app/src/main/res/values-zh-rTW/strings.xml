@@ -173,6 +173,7 @@
     <string name="pokemon_tool_unlock_money">解鎖金錢</string>
     <string name="pokemon_tool_fix_security_key">修正加密金鑰 (Glazed/Hack)</string>
     <string name="pokemon_tool_set_version">設定遊戲版本</string>
+    <string name="pokemon_tool_refresh">重新整理數據</string>
     <string name="pokemon_trainer_located_format">訓練家位址：0x%1$08X</string>
     <string name="pokemon_trainer_not_found">找不到訓練家。</string>
     <string name="pokemon_money_format">金錢：%1$d</string>
@@ -193,4 +194,11 @@
     <string name="pokemon_version_ruby">紅寶石版</string>
     <string name="pokemon_version_sapphire">藍寶石版</string>
     <string name="pokemon_version_emerald">綠寶石版</string>
+    <string name="pokemon_team">目前隊伍</string>
+    <string name="pokemon_stats">數值</string>
+    <string name="pokemon_iv_ev">個體值 / 努力值</string>
+    <string name="pokemon_moves">招式</string>
+    <string name="pokemon_personality">性格與屬性</string>
+    <string name="pokemon_shiny">閃光</string>
+    <string name="pokemon_edit_title_format">編輯 %1$s</string>
 </resources>

@@ -83,20 +83,42 @@ final class PokemonToolsViewBuilder {
             tabs.setBackgroundColor(0x33000000);
             tabs.setPadding(host.dp(4), host.dp(4), host.dp(4), host.dp(4));
 
-            String[] pocketNames = {
-                    activity.getString(R.string.pokemon_pocket_items),
-                    activity.getString(R.string.pokemon_pocket_balls),
-                    activity.getString(R.string.pokemon_pocket_key),
-                    activity.getString(R.string.pokemon_pocket_tm),
-                    activity.getString(R.string.pokemon_pocket_berry)
-            };
-            PokemonConstants.Pocket[] pocketTypes = {
-                    PokemonConstants.Pocket.ITEMS,
-                    PokemonConstants.Pocket.BALLS,
-                    PokemonConstants.Pocket.KEY_ITEMS,
-                    PokemonConstants.Pocket.TM_HM,
-                    PokemonConstants.Pocket.BERRIES
-            };
+            String[] pocketNames;
+            PokemonConstants.Pocket[] pocketTypes;
+            
+            if (pm.getEffectiveVersion() == PokemonConstants.GameVersion.FIRE_RED || pm.getEffectiveVersion() == PokemonConstants.GameVersion.LEAF_GREEN) {
+                // FireRed / LeafGreen: 3 main pockets as requested
+                pocketNames = new String[]{
+                        activity.getString(R.string.pokemon_pocket_items),
+                        activity.getString(R.string.pokemon_pocket_key),
+                        activity.getString(R.string.pokemon_pocket_balls)
+                };
+                pocketTypes = new PokemonConstants.Pocket[]{
+                        PokemonConstants.Pocket.ITEMS,
+                        PokemonConstants.Pocket.KEY_ITEMS,
+                        PokemonConstants.Pocket.BALLS
+                };
+                // Safety: if currently in TM or BERRY pocket, switch to ITEMS
+                if (sCurrentPocket == PokemonConstants.Pocket.TM_HM || sCurrentPocket == PokemonConstants.Pocket.BERRIES) {
+                    sCurrentPocket = PokemonConstants.Pocket.ITEMS;
+                }
+            } else {
+                // Emerald / Ruby / Sapphire: 5 pockets
+                pocketNames = new String[]{
+                        activity.getString(R.string.pokemon_pocket_items),
+                        activity.getString(R.string.pokemon_pocket_balls),
+                        activity.getString(R.string.pokemon_pocket_key),
+                        activity.getString(R.string.pokemon_pocket_tm),
+                        activity.getString(R.string.pokemon_pocket_berry)
+                };
+                pocketTypes = new PokemonConstants.Pocket[]{
+                        PokemonConstants.Pocket.ITEMS,
+                        PokemonConstants.Pocket.BALLS,
+                        PokemonConstants.Pocket.KEY_ITEMS,
+                        PokemonConstants.Pocket.TM_HM,
+                        PokemonConstants.Pocket.BERRIES
+                };
+            }
 
             for (int i = 0; i < pocketNames.length; i++) {
                 final int idx = i;
@@ -115,6 +137,8 @@ final class PokemonToolsViewBuilder {
             }
             hsv.addView(tabs);
             root.addView(hsv);
+
+            buildPartySection(activity, pm, root, refreshAll, host);
 
             TextView pocketTitle = new TextView(activity);
             pocketTitle.setText(activity.getString(R.string.pokemon_pocket_format, sCurrentPocket.name()));
@@ -188,12 +212,25 @@ final class PokemonToolsViewBuilder {
         PokemonManager pm = host.getPokemonManager();
         if (pm == null) return;
 
+        LinearLayout header = new LinearLayout(activity);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(header);
+
         TextView title = new TextView(activity);
         title.setText(activity.getString(R.string.pokemon_tools_debugger));
         title.setTextColor(Color.rgb(61, 155, 235));
         title.setTypeface(null, Typeface.BOLD);
         title.setTextSize(14f);
-        root.addView(title);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView refreshBtn = new TextView(activity);
+        refreshBtn.setText("\u21BB"); // Refresh symbol
+        refreshBtn.setTextColor(Color.CYAN);
+        refreshBtn.setTextSize(20f);
+        refreshBtn.setPadding(host.dp(12), 0, host.dp(12), 0);
+        refreshBtn.setOnClickListener(v -> refreshAll.run());
+        header.addView(refreshBtn);
 
         TextView versionInfo = new TextView(activity);
         PokemonConstants.GameVersion autoVersion = pm.detectVersion();
@@ -283,6 +320,157 @@ final class PokemonToolsViewBuilder {
             if (ms != null) ms.setXorMode(checked, pm.findSecurityKey());
         });
         root.addView(xorCb);
+    }
+
+    private static void buildPartySection(Activity activity, PokemonManager pm, LinearLayout root, Runnable refresh, Host host) {
+        List<PokemonEntry> team = pm.getParty();
+        if (team.isEmpty()) return;
+
+        TextView title = new TextView(activity);
+        title.setText(activity.getString(R.string.pokemon_team));
+        title.setTextColor(Color.WHITE);
+        title.setPadding(0, host.dp(12), 0, host.dp(4));
+        title.setTextSize(14f);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title);
+
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, host.dp(4), 0, host.dp(8));
+        
+        for (PokemonEntry p : team) {
+            LinearLayout cell = new LinearLayout(activity);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(host.dp(4), host.dp(4), host.dp(4), host.dp(4));
+            cell.setBackground(makeRoundRect(0x22FFFFFF, host.dp(6)));
+            
+            TextView name = new TextView(activity);
+            name.setText(pm.getPokemonNickname(p));
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(10f);
+            cell.addView(name);
+            
+            TextView lvl = new TextView(activity);
+            lvl.setText("Lv" + p.level);
+            lvl.setTextColor(Color.YELLOW);
+            lvl.setTextSize(9f);
+            cell.addView(lvl);
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            lp.setMargins(host.dp(2), 0, host.dp(2), 0);
+            row.addView(cell, lp);
+            
+            cell.setOnClickListener(v -> showPokemonEditDialog(activity, pm, p, refresh));
+        }
+        root.addView(row);
+    }
+
+    private interface StatCallback {
+        void onChange(int value);
+    }
+
+    private static void showPokemonEditDialog(Activity activity, PokemonManager pm, PokemonEntry p, Runnable refresh) {
+        ScrollView scroll = new ScrollView(activity);
+        LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(32, 16, 32, 16);
+        scroll.addView(root);
+
+        root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_stats)));
+        TextView basicInfo = new TextView(activity);
+        basicInfo.setText("Species: " + pm.getSpeciesName(p.species) + " (" + pm.getPokemonNickname(p) + ")\nLevel: " + p.level + " | HP: " + p.currentHp + " / " + p.maxHp);
+        basicInfo.setTextColor(Color.LTGRAY);
+        root.addView(basicInfo);
+
+        root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_iv_ev)));
+        addStatEditRow(activity, root, "HP", p.hpIv, p.hpEv, val -> p.hpIv = val, val -> p.hpEv = val);
+        addStatEditRow(activity, root, "ATK", p.atkIv, p.atkEv, val -> p.atkIv = val, val -> p.atkEv = val);
+        addStatEditRow(activity, root, "DEF", p.defIv, p.defEv, val -> p.defIv = val, val -> p.defEv = val);
+        addStatEditRow(activity, root, "SpA", p.spAtkIv, p.spAtkEv, val -> p.spAtkIv = val, val -> p.spAtkEv = val);
+        addStatEditRow(activity, root, "SpD", p.spDefIv, p.spDefEv, val -> p.spDefIv = val, val -> p.spDefEv = val);
+        addStatEditRow(activity, root, "SPD", p.speedIv, p.speedEv, val -> p.speedIv = val, val -> p.speedEv = val);
+
+        root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_personality)));
+        root.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_shiny), () -> {
+            makeShiny(p);
+            Toast.makeText(activity, "Magic applied (Shiny mode)", Toast.LENGTH_SHORT).show();
+        }));
+
+        new AlertDialog.Builder(activity)
+                .setTitle(activity.getString(R.string.pokemon_edit_title_format, pm.getSpeciesName(p.species)))
+                .setView(scroll)
+                .setPositiveButton(activity.getString(R.string.cheat_save), (d, w) -> {
+                    byte[] raw = p.toRaw();
+                    if (NativeBridge.writeMemory(p.address, raw)) {
+                        Toast.makeText(activity, "Pokemon Saved", Toast.LENGTH_SHORT).show();
+                        refresh.run();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void makeShiny(PokemonEntry p) {
+        long tid = p.otId & 0xFFFF;
+        long sid = (p.otId >> 16) & 0xFFFF;
+        long target = tid ^ sid;
+        
+        // Find a PV that makes (tid ^ sid ^ pvLow ^ pvHigh) < 8
+        // We'll keep pvHigh and change pvLow to match the target
+        long pvHigh = (p.pv >> 16) & 0xFFFF;
+        long pvLow = target ^ pvHigh ^ 0x0000; // Condition met when XORing result is 0
+        p.pv = (pvHigh << 16) | pvLow;
+    }
+
+    private static void addStatEditRow(Activity activity, LinearLayout root, String label, int iv, int ev, 
+                                     StatCallback onIvChange, 
+                                     StatCallback onEvChange) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        
+        TextView lbl = new TextView(activity);
+        lbl.setText(label); lbl.setTextColor(Color.WHITE); lbl.setEms(3);
+        row.addView(lbl);
+
+        android.widget.EditText ivIn = new android.widget.EditText(activity);
+        ivIn.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        ivIn.setText(String.valueOf(iv));
+        ivIn.setHint("IV");
+        ivIn.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(android.text.Editable s) {
+                try { onIvChange.onChange(Math.min(31, Integer.parseInt(s.toString()))); } catch (Exception ignored) {}
+            }
+        });
+        row.addView(ivIn, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        android.widget.EditText evIn = new android.widget.EditText(activity);
+        evIn.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        evIn.setText(String.valueOf(ev));
+        evIn.setHint("EV");
+        evIn.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(android.text.Editable s) {
+                try { onEvChange.onChange(Math.min(255, Integer.parseInt(s.toString()))); } catch (Exception ignored) {}
+            }
+        });
+        row.addView(evIn, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        root.addView(row);
+    }
+
+    private static TextView sectionTitle(Activity activity, String text) {
+        TextView title = new TextView(activity);
+        title.setText(text);
+        title.setTextColor(Color.rgb(61, 155, 235));
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(14f);
+        title.setPadding(0, 16, 0, 8);
+        return title;
     }
 
     private static void showEditMoneyDialog(Activity activity, Host host, PokemonManager pm, Runnable refreshAll) {
