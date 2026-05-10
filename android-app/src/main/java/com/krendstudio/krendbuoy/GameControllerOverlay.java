@@ -312,9 +312,15 @@ final class GameControllerOverlay {
     }
 
     private static void setPressed(VirtualButton b, boolean p) {
-        if (b.pressed == p) return; b.pressed = p; NativeBridge.setButtonState(b.button, p);
-        if (sUseSkin) b.view.setAlpha(p ? 0.3f : 0.0f); else b.view.setAlpha(p ? 1.0f : 0.85f);
-        if (b.view.getBackground() instanceof GradientDrawable) ((GradientDrawable) b.view.getBackground()).setColor(Color.WHITE);
+        if (b.pressed == p) return;
+        b.pressed = p;
+        NativeBridge.setButtonState(b.button, p);
+        
+        if (sUseSkin) {
+            b.view.setAlpha(p ? 0.3f : 0.0f);
+        } else {
+            b.view.setAlpha(p ? 1.0f : 0.85f);
+        }
     }
 
     private static TextView addActionButton(Activity a, FrameLayout p, List<VirtualButton> bs, String l, int b, int w, int h, float cx, float cy, int r) {
