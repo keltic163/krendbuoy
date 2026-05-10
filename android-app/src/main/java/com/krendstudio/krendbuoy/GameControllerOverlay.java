@@ -59,6 +59,58 @@ final class GameControllerOverlay {
 
     private GameControllerOverlay() {}
 
+    static void attachLandscape(Activity activity, FrameLayout root, Host host, int sideWidth) {
+        sCurrentPage = PAGE_CONTROLLER;
+        ControllerLayoutEditor.reset();
+        sUseSkin = false; // Always system buttons in landscape as requested
+        int menuIconSize = host.dp(36);
+        int margin = host.dp(12);
+
+        // Top-Right System Controls
+        OverlayUiFactory.addSystemControl(activity, root, "\u2630", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin, host.dp(8), host::showQuickMenu);
+        OverlayUiFactory.addSystemControl(activity, root, "\uD83D\uDCE5", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize + host.dp(6), host.dp(8), () -> host.showStateSlotDialog(false));
+        OverlayUiFactory.addSystemControl(activity, root, "\uD83D\uDCBE", menuIconSize, menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 2 + host.dp(12), host.dp(8), () -> host.showStateSlotDialog(true));
+        TextView speed = OverlayUiFactory.addSystemControl(activity, root, host.emulationSpeedLabel(), host.dp(44), menuIconSize, Gravity.TOP | Gravity.RIGHT, margin + menuIconSize * 3 + host.dp(18), host.dp(8), host::cycleEmulationSpeed);
+        speed.setOnClickListener(v -> { host.cycleEmulationSpeed(); speed.setText(host.emulationSpeedLabel()); }); speed.setTextSize(11f);
+
+        // Panel for side controls
+        FrameLayout panel = new FrameLayout(activity);
+        panel.setClipChildren(false); panel.setClipToPadding(false);
+        root.addView(panel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        sActionButtons.clear();
+        DpadState dpadState = new DpadState();
+        List<VirtualButton> actionButtons = new ArrayList<>();
+
+        panel.post(() -> {
+            int w = panel.getWidth(), h = panel.getHeight(); if (w <= 0 || h <= 0) return;
+            int dpadSize = Math.min(sideWidth - host.dp(16), host.dp(160));
+            int actionSize = Math.round(sideWidth * 0.45f);
+            int shoulderWidth = Math.round(sideWidth * 0.5f), shoulderHeight = host.dp(40);
+            int startSelectWidth = Math.round(sideWidth * 0.4f), startSelectHeight = host.dp(28);
+
+            // Left Side: D-pad and Select
+            sDpadView = makeDpadPad(activity, host, dpadSize);
+            OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, sideWidth / 2f, h * 0.70f);
+            addActionButton(activity, panel, actionButtons, "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, sideWidth / 2f, h * 0.90f, 10);
+
+            // Right Side: L/R, A/B, Start
+            addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w - sideWidth * 0.7f, h * 0.15f, 10);
+            addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w - sideWidth * 0.3f, h * 0.15f, 10);
+            addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, actionSize, w - sideWidth * 0.65f, h * 0.65f, actionSize / 2);
+            addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, actionSize, w - sideWidth * 0.30f, h * 0.50f, actionSize / 2);
+            addActionButton(activity, panel, actionButtons, "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w - sideWidth / 2f, h * 0.85f, 10);
+            
+            sActionButtons.addAll(actionButtons);
+
+            panel.setOnTouchListener((view, event) -> {
+                updateDpad(sDpadView, dpadState, event);
+                updateVirtualButtons(actionButtons, event);
+                return true;
+            });
+        });
+    }
+
     static void attach(Activity activity, FrameLayout root, Host host) {
         sCurrentPage = PAGE_CONTROLLER;
         ControllerLayoutEditor.reset();

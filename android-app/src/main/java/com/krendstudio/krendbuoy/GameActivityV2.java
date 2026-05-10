@@ -87,48 +87,37 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         if (saveFolder != null && !saveFolder.isEmpty()) portableSaveFolderUri = Uri.parse(saveFolder);
         portableSaveManager = new PortableSaveManager(this, portableSaveFolderUri, this);
 
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(18, 22, 26));
-
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(8), dp(62), dp(8), 0);
-        root.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        int screenWidth = getResources().getDisplayMetrics().widthPixels - dp(16);
-        int screenHeight = Math.round(screenWidth * 2f / 3f);
-        screenHeight = Math.max(dp(220), Math.min(screenHeight, dp(360)));
-
-        info = new TextView(this);
-        info.setText("00:00:00 / 0 FPS");
-        info.setTextSize(11f);
-        info.setTextColor(Color.GRAY);
-        info.setGravity(Gravity.LEFT);
-        info.setPadding(dp(8), 0, 0, dp(4));
-        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
-        content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        screenBox = new FrameLayout(this);
-        screenBox.setBackgroundColor(Color.BLACK);
-        content.addView(screenBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, screenHeight));
-
-        screen = new ImageView(this);
-        screen.setAdjustViewBounds(false);
-        screen.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        screenBox.addView(screen, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
-        frameLoopManager = new FrameLoopManager(this, screen);
-
-        screenBorder = new View(this);
-        screenBorder.setBackground(new BorderDrawable(dp(4), Color.GRAY));
-        screenBorder.setVisibility(screenBorderEnabled ? View.VISIBLE : View.GONE);
-        screenBox.addView(screenBorder, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        applyDisplayMode();
-
-        GameControllerOverlay.attach(this, root, this);
-        setContentView(root);
+        rebuildUi();
         new Thread(() -> prepareAndStart(currentRomUri), "KrendBuoy-prepare-v2").start();
+    }
+
+    private void rebuildUi() {
+        boolean landscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        GamePortraitLayout.Result res = landscape 
+                ? GameLandscapeLayout.build(this, this)
+                : GamePortraitLayout.build(this, this);
+        
+        this.info = res.info;
+        this.screen = res.screen;
+        this.screenBox = res.screenBox;
+        this.screenBorder = res.screenBorder;
+        
+        info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
+        screenBorder.setVisibility(screenBorderEnabled ? View.VISIBLE : View.GONE);
+        applyDisplayMode();
+        setContentView(res.root);
+        
+        if (frameLoopManager != null) {
+            frameLoopManager.stop();
+            frameLoopManager = new FrameLoopManager(this, screen);
+            if (!menuPaused && !restarting) frameLoopManager.start();
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        rebuildUi();
     }
 
     @Override
@@ -627,7 +616,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
-    private static class BorderDrawable extends Drawable {
+    public static class BorderDrawable extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int strokeWidth;
 
