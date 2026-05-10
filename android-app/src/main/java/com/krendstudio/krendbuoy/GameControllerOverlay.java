@@ -59,6 +59,26 @@ final class GameControllerOverlay {
 
     private GameControllerOverlay() {}
 
+    static void startEditingLandscape(Activity activity, Host host) {
+        // Need access to the panel view. Since GameControllerOverlay is static-state based right now:
+        if (sDpadView == null || sDpadView.getParent() == null) return;
+        FrameLayout panel = (FrameLayout) sDpadView.getParent();
+        
+        ControllerLayoutEditor.start(
+                panel,
+                sDpadView,
+                sActionButtons,
+                false, // sUseSkin is always false in landscape
+                true,  // landscape
+                new ControllerLayoutEditor.Host() {
+                    @Override public int dp(int value) { return host.dp(value); }
+                    @Override public AppSettingsManager getSettingsManager() { return host.getSettingsManager(); }
+                },
+                null, // No need to switch pages in landscape
+                null
+        );
+    }
+
     static void attachLandscape(Activity activity, FrameLayout root, Host host, int sideWidth) {
         sCurrentPage = PAGE_CONTROLLER;
         ControllerLayoutEditor.reset();

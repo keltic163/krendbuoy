@@ -567,6 +567,16 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         GameSettingsDialogs.showControllerSettings(this, this);
     }
 
+    @Override
+    public void onEditLayout() {
+        boolean landscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        if (landscape) {
+            GameControllerOverlay.startEditingLandscape(this, this);
+        } else {
+            showControllerSettingsDialog();
+        }
+    }
+
     public void showGlobalSettingsDialog() {
         GameSettingsDialogs.showGlobalSettings(this, this);
     }

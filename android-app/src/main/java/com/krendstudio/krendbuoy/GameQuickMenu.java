@@ -15,7 +15,7 @@ final class GameQuickMenu {
         void releaseAllButtons();
         void restartGame();
         void leaveGame();
-        void showControllerSettingsDialog();
+        void onEditLayout();
     }
 
     private GameQuickMenu() {
@@ -52,7 +52,7 @@ final class GameQuickMenu {
                     } else if (which == 1) {
                         host.restartGame();
                     } else if (isLandscape && which == 2) {
-                        host.showControllerSettingsDialog();
+                        host.onEditLayout();
                     } else if ((isLandscape && which == 3) || (!isLandscape && which == 2)) {
                         host.leaveGame();
                     }
