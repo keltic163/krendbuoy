@@ -15,6 +15,7 @@ final class GameQuickMenu {
         void releaseAllButtons();
         void restartGame();
         void leaveGame();
+        void showControllerSettingsDialog();
     }
 
     private GameQuickMenu() {
@@ -24,13 +25,23 @@ final class GameQuickMenu {
         host.pauseEmulationForMenu();
         host.releaseAllButtons();
 
-        // Removed "Display Settings" and "Audio Preset" as they are in global settings.
-        // Moved "Return to Main Menu" to the last option.
-        String[] items = {
-                activity.getString(R.string.quick_menu_resume),
-                activity.getString(R.string.quick_menu_restart_game),
-                activity.getString(R.string.quick_menu_return_main_menu)
-        };
+        boolean isLandscape = activity.getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        
+        String[] items;
+        if (isLandscape) {
+            items = new String[]{
+                    activity.getString(R.string.quick_menu_resume),
+                    activity.getString(R.string.quick_menu_restart_game),
+                    activity.getString(R.string.settings_edit_controller_layout),
+                    activity.getString(R.string.quick_menu_return_main_menu)
+            };
+        } else {
+            items = new String[]{
+                    activity.getString(R.string.quick_menu_resume),
+                    activity.getString(R.string.quick_menu_restart_game),
+                    activity.getString(R.string.quick_menu_return_main_menu)
+            };
+        }
 
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.quick_menu_title))
@@ -40,7 +51,9 @@ final class GameQuickMenu {
                         dialog.dismiss();
                     } else if (which == 1) {
                         host.restartGame();
-                    } else if (which == 2) {
+                    } else if (isLandscape && which == 2) {
+                        host.showControllerSettingsDialog();
+                    } else if ((isLandscape && which == 3) || (!isLandscape && which == 2)) {
                         host.leaveGame();
                     }
                 })
