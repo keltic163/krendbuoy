@@ -58,7 +58,7 @@ final class ControllerLayoutEditor {
             Runnable switchToSettings
     ) {
         sEditing = true;
-        switchToController.run();
+        if (switchToController != null) switchToController.run();
         dpadView.setBackgroundColor(0x66888888);
 
         for (ButtonBinding button : actionButtons) {
@@ -156,7 +156,7 @@ final class ControllerLayoutEditor {
             }
         }
 
-        switchToSettings.run();
+        if (switchToSettings != null) switchToSettings.run();
     }
 
     private static void saveLayout(
