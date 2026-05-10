@@ -157,6 +157,11 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     @Override
     protected void onResume() {
         super.onResume();
+        
+        // Ensure System UI is correct (especially when starting in landscape)
+        boolean isLandscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        updateSystemUi(isLandscape);
+
         if (!finishingFromMenu && !restarting && !menuPaused && frameLoopManager != null && frameLoopManager.isRunning()) {
             startAudioPlayback();
         }
