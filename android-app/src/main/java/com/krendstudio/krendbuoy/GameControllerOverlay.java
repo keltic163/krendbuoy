@@ -91,15 +91,15 @@ final class GameControllerOverlay {
 
             // Left Side: D-pad and Select
             sDpadView = makeDpadPad(activity, host, dpadSize);
-            OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, sideWidth / 2f, h * 0.70f);
+            OverlayUiFactory.placeByCenter(panel, sDpadView, dpadSize, dpadSize, sideWidth / 2f, h * 0.6f);
             addActionButton(activity, panel, actionButtons, "SELECT", NativeBridge.BUTTON_SELECT, startSelectWidth, startSelectHeight, sideWidth / 2f, h * 0.90f, 10);
 
             // Right Side: L/R, A/B, Start
-            addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w - sideWidth * 0.7f, h * 0.15f, 10);
-            addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w - sideWidth * 0.3f, h * 0.15f, 10);
-            addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, actionSize, w - sideWidth * 0.65f, h * 0.65f, actionSize / 2);
+            addActionButton(activity, panel, actionButtons, "L", NativeBridge.BUTTON_L, shoulderWidth, shoulderHeight, w - sideWidth * 0.75f, h * 0.175f, 9);
+            addActionButton(activity, panel, actionButtons, "R", NativeBridge.BUTTON_R, shoulderWidth, shoulderHeight, w - sideWidth * 0.3f, h * 0.175f, 9);
+            addActionButton(activity, panel, actionButtons, "B", NativeBridge.BUTTON_B, actionSize, actionSize, w - sideWidth * 0.75f, h * 0.65f, actionSize / 2);
             addActionButton(activity, panel, actionButtons, "A", NativeBridge.BUTTON_A, actionSize, actionSize, w - sideWidth * 0.30f, h * 0.50f, actionSize / 2);
-            addActionButton(activity, panel, actionButtons, "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w - sideWidth / 2f, h * 0.85f, 10);
+            addActionButton(activity, panel, actionButtons, "START", NativeBridge.BUTTON_START, startSelectWidth, startSelectHeight, w - sideWidth / 2f, h * 0.90f, 10);
             
             sActionButtons.addAll(actionButtons);
 

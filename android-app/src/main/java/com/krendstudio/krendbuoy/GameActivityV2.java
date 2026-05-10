@@ -93,6 +93,8 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     private void rebuildUi() {
         boolean landscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        updateSystemUi(landscape);
+        
         GamePortraitLayout.Result res = landscape 
                 ? GameLandscapeLayout.build(this, this)
                 : GamePortraitLayout.build(this, this);
@@ -111,6 +113,31 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
             frameLoopManager.stop();
             frameLoopManager = new FrameLoopManager(this, screen);
             if (!menuPaused && !restarting) frameLoopManager.start();
+        }
+    }
+
+    private void updateSystemUi(boolean landscape) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                if (landscape) {
+                    controller.hide(android.view.WindowInsets.Type.statusBars());
+                    controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                } else {
+                    controller.show(android.view.WindowInsets.Type.statusBars());
+                }
+            }
+        } else {
+            // Legacy implementation
+            View decorView = getWindow().getDecorView();
+            int flags = decorView.getSystemUiVisibility();
+            if (landscape) {
+                flags |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            } else {
+                flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
+                flags &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            }
+            decorView.setSystemUiVisibility(flags);
         }
     }
 
