@@ -586,6 +586,12 @@ public class MainActivity extends Activity implements SharedSettingsBuilder.Host
         startActivity(intent);
     }
 
+    @Override
+    public void onBackPressed() {
+        // Fully close the application and clear all activities
+        finishAffinity();
+    }
+
     @Override protected void onResume() { super.onResume(); refreshRomList(); }
 
     @Override
