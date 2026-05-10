@@ -54,6 +54,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
     private CheatManager cheatManager;
     private PokemonManager pokemonManager;
     private MemoryScanner memoryScanner;
+    private FrameLayout screenBox;
     private View screenBorder;
     
     // Performance optimization and Seamless Resumption
@@ -108,7 +109,7 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
         info.setVisibility(debugTextVisible ? View.VISIBLE : View.GONE);
         content.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        FrameLayout screenBox = new FrameLayout(this);
+        screenBox = new FrameLayout(this);
         screenBox.setBackgroundColor(Color.BLACK);
         content.addView(screenBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, screenHeight));
 
@@ -549,12 +550,25 @@ public class GameActivityV2 extends Activity implements GameControllerOverlay.Ho
 
     private void applyDisplayMode() {
         if (displayMode == AppSettingsManager.SCALE_INTEGER) {
+            int boxW = screenBox.getWidth();
+            int boxH = screenBox.getHeight();
+
+            // Fallback if layout hasn't happened yet
+            if (boxW <= 0 || boxH <= 0) {
+                boxW = getResources().getDisplayMetrics().widthPixels - dp(16);
+                boxH = Math.max(dp(220), Math.min(Math.round(boxW * 2f / 3f), dp(360)));
+            }
+
+            int scaleW = boxW / 240;
+            int scaleH = boxH / 160;
+            int finalScale = Math.max(1, Math.min(scaleW, scaleH));
+
             screen.setAdjustViewBounds(true);
             screen.setScaleType(ImageView.ScaleType.CENTER);
-            // GBA is 240x160. 2x is 480x320.
+
             ViewGroup.LayoutParams lp = screen.getLayoutParams();
-            lp.width = dp(480);
-            lp.height = dp(320);
+            lp.width = 240 * finalScale;
+            lp.height = 160 * finalScale;
             screen.setLayoutParams(lp);
         } else {
             screen.setAdjustViewBounds(displayMode != AppSettingsManager.SCALE_STRETCH);
