@@ -19,17 +19,62 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create stable debug keystore
+      - name: Restore stable debug keystore
         run: |
-          keytool -genkeypair \
-            -alias androiddebugkey \
-            -keypass android \
-            -storepass android \
-            -keystore android-app/debug.keystore \
-            -dname "CN=Android Debug,O=KrendStudio,C=TW" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
+          mkdir -p "$HOME/.android"
+          cat > "$HOME/.android/debug.keystore.base64" <<'EOF'
+          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
+          AicQ
+          EOF
+          base64 --decode "$HOME/.android/debug.keystore.base64" > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -44,6 +89,25 @@ jobs:
         run: |
           sdkmanager --install "ndk;26.3.11579264" "platforms;android-34" "build-tools;34.0.0"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.3.11579264" >> $GITHUB_ENV
+
+      - name: Set CI debug version
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          run_number = int(os.environ['GITHUB_RUN_NUMBER'])
+          run_attempt = os.environ.get('GITHUB_RUN_ATTEMPT', '1')
+          version_code = 1000 + run_number
+          version_name = f"0.1.0-debug.{run_number}.{run_attempt}"
+
+          path = Path('android-app/build.gradle')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('versionCode 1', f'versionCode {version_code}', 1)
+          text = text.replace("versionName '0.1.0'", f"versionName '{version_name}'", 1)
+          path.write_text(text, encoding='utf-8')
+          print(f'Using versionCode={version_code}, versionName={version_name}')
+          PY
 
       - name: Build APK
         run: |
