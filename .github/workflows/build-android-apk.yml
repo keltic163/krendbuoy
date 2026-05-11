@@ -72,7 +72,7 @@ jobs:
           BCA/Mkc0kSpUtNvFxDweaZwNYUd9aMVBLHqLfQBiFKzuIQQU7EsxsMZzYnbx5gOHpX33SWjubEcC
           AicQ
           EOF
-          base64 --decode "$HOME/.android/debug.keystore.base64" > "$HOME/.android/debug.keystore"
+          tr -d '[:space:]' < "$HOME/.android/debug.keystore.base64" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
           keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
