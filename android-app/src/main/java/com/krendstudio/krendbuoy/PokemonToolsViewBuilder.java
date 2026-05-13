@@ -274,6 +274,17 @@ final class PokemonToolsViewBuilder {
                 new LinearLayout.LayoutParams(host.dp(60), host.dp(34)));
         root.addView(moneyRow);
 
+        // NEW: Prominent Team Editor Entry
+        root.addView(makeSystemButton(activity, "\uD83D\uDCDC " + activity.getString(R.string.pokemon_team) + " " + activity.getString(R.string.pokemon_money_edit), () -> {
+            List<PokemonEntry> team = pm.getParty();
+            if (team.isEmpty()) {
+                Toast.makeText(activity, activity.getString(R.string.pokemon_bag_empty), Toast.LENGTH_SHORT).show();
+            } else {
+                showTeamSelectorDialog(activity, pm, team, refreshAll);
+            }
+        }), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, host.dp(44)));
+        root.addView(new View(activity), new LinearLayout.LayoutParams(1, host.dp(12)));
+
         TextView debugText = new TextView(activity);
         byte[] raw = pm.readRawMoney();
         int rawValue = (raw != null && raw.length >= 4) ? ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN).getInt() : 0;
@@ -364,6 +375,18 @@ final class PokemonToolsViewBuilder {
             cell.setOnClickListener(v -> showPokemonEditDialog(activity, pm, p, refresh));
         }
         root.addView(row);
+    }
+
+    private static void showTeamSelectorDialog(Activity activity, PokemonManager pm, List<PokemonEntry> team, Runnable refresh) {
+        String[] names = new String[team.size()];
+        for (int i = 0; i < team.size(); i++) {
+            PokemonEntry p = team.get(i);
+            names[i] = "Lv" + p.level + " " + pm.getPokemonNickname(p);
+        }
+        new AlertDialog.Builder(activity)
+                .setTitle(activity.getString(R.string.pokemon_team))
+                .setItems(names, (d, which) -> showPokemonEditDialog(activity, pm, team.get(which), refresh))
+                .show();
     }
 
     private interface StatCallback {
