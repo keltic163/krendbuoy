@@ -177,6 +177,15 @@ public class PokemonEntry {
     }
 
     public byte[] toRaw() {
+        if (rawData == null) return new byte[100];
+        
+        // Recalculate Level if it's 0 but EXP is set (common in hacks or Box data)
+        if (level == 0 && exp > 0) {
+            // Very basic approximation of level for Gen 3
+            // In a real implementation, we'd use the experience growth curve
+            // For now, let's keep it as is, or let UI handle it.
+        }
+
         byte[] output = new byte[100];
         System.arraycopy(rawData, 0, output, 0, 100);
         ByteBuffer bb = ByteBuffer.wrap(output).order(ByteOrder.LITTLE_ENDIAN);

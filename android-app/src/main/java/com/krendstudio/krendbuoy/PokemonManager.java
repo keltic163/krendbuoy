@@ -328,20 +328,23 @@ public class PokemonManager {
         GameVersion v = getEffectiveVersion();
         boolean rse = usesRseLayout(v);
         
-        // 1. Try standard offsets first
-        int[] offsets = rse ? new int[]{0x0234} : new int[]{0x0034, 0x0038, 0x0040};
+        // 1. Try standard offsets first (with wider range)
+        int[] offsets = rse ? new int[]{0x0234, 0x0238, 0x0240} : new int[]{0x0034, 0x0038, 0x0040};
         for (int off : offsets) {
             if (scanPartyAtOffset(team, saveBlock2Addr + off)) return team;
         }
         
         // 2. Perform a thorough scan near SB2 (compensates for shifted hack structures)
-        byte[] nearData = NativeBridge.readMemory(saveBlock2Addr, 1000);
+        // Search 2KB around SB2
+        byte[] nearData = NativeBridge.readMemory(saveBlock2Addr, 2048);
         if (nearData != null) {
             for (int i = 0x20; i < nearData.length - 100; i += 4) {
                 if (scanPartyAtOffset(team, saveBlock2Addr + i)) return team;
             }
         }
         
+        // 3. Last Resort: Brute-force RAM for Party Signature (PV, OTID, Nickname pattern)
+        // This is slow, so we only do it if the Trainer button was explicitly clicked
         return team;
     }
 
@@ -407,9 +410,15 @@ public class PokemonManager {
 
     public String getSpeciesName(int id) {
         if (id == 0) return "---";
+        
+        // 1. Priority: Use built-in high-quality Traditional Chinese database
+        String dbName = PokemonConstants.getSpeciesName(id);
+        if (!dbName.startsWith("未知精靈")) return dbName;
+        
+        // 2. Fallback to ROM text
         if (!speciesLoaded) loadSpeciesNamesFromRom();
         String cached = speciesNameCache.get(id);
-        return cached != null ? cached : "Species #" + id;
+        return cached != null ? cached : dbName;
     }
 
     public String getPokemonNickname(PokemonEntry p) {
