@@ -276,9 +276,12 @@ final class PokemonToolsViewBuilder {
 
         // NEW: Prominent Team Editor Entry
         root.addView(makeSystemButton(activity, "\uD83D\uDCDC " + activity.getString(R.string.pokemon_team) + " " + activity.getString(R.string.pokemon_money_edit), () -> {
+            if (pm.getSaveBlock2Addr() == 0) {
+                pm.autoLocateByPointers();
+            }
             List<PokemonEntry> team = pm.getParty();
             if (team.isEmpty()) {
-                Toast.makeText(activity, activity.getString(R.string.pokemon_bag_empty), Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, activity.getString(R.string.pokemon_bag_empty) + " (SB2: " + Integer.toHexString(pm.getSaveBlock2Addr()) + ")", Toast.LENGTH_SHORT).show();
             } else {
                 showTeamSelectorDialog(activity, pm, team, refreshAll);
             }
