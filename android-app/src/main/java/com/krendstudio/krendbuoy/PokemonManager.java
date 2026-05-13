@@ -74,15 +74,6 @@ public class PokemonManager {
             }
         }
         
-        // RE-VALIDATION: Check if this SB2 actually contains valid party data
-        if (saveBlock2Addr != 0) {
-            List<PokemonEntry> test = new ArrayList<>();
-            if (!scanPartyAtOffset(test, saveBlock2Addr + (rse ? 0x0234 : 0x0034))) {
-                // If standard offset fails, we must perform a scan because pointers might be stale
-                saveBlock2Addr = 0; 
-            }
-        }
-
         calibratePockets(v);
         return saveBlock2Addr >= 0x02000000;
     }
@@ -338,48 +329,62 @@ public class PokemonManager {
         List<PokemonEntry> team = new ArrayList<>();
         if (saveBlock2Addr == 0) return team;
         GameVersion v = getEffectiveVersion();
-        boolean rse = usesRseLayout(v);
         
-        // 1. Try standard offsets first (with wider range)
-        int[] offsets = rse ? new int[]{0x0234, 0x0238, 0x0240} : new int[]{0x0034, 0x0038, 0x0040};
-        for (int off : offsets) {
-            if (scanPartyAtOffset(team, saveBlock2Addr + off)) return team;
-        }
+        // 1. Scan a 2KB range around SB2 to find the highest-quality party data
+        int searchStart = Math.max(0x02000000, saveBlock2Addr - 0x100);
+        byte[] scanRange = NativeBridge.readMemory(searchStart, 2048);
+        if (scanRange == null) return team;
         
-        // 2. Perform a thorough scan near SB2 (compensates for shifted hack structures)
-        // Search 2KB around SB2
-        byte[] nearData = NativeBridge.readMemory(saveBlock2Addr, 2048);
-        if (nearData != null) {
-            for (int i = 0x20; i < nearData.length - 100; i += 4) {
-                if (scanPartyAtOffset(team, saveBlock2Addr + i)) return team;
+        int bestAddr = 0;
+        int maxScore = -1;
+        
+        // Step through memory and score potential party starts
+        for (int i = 0; i < scanRange.length - 600; i += 4) {
+            int currentScore = scorePartyData(scanRange, i, searchStart + i);
+            if (currentScore > maxScore && currentScore >= 10) { // Minimum threshold
+                maxScore = currentScore;
+                bestAddr = searchStart + i;
             }
         }
         
-        // 3. Last Resort: Brute-force RAM for Party Signature (PV, OTID, Nickname pattern)
-        // This is slow, so we only do it if the Trainer button was explicitly clicked
+        if (bestAddr != 0) {
+            byte[] finalData = NativeBridge.readMemory(bestAddr, 600);
+            if (finalData != null) {
+                for (int j = 0; j < 6; j++) {
+                    byte[] pkmnRaw = new byte[100];
+                    System.arraycopy(finalData, j * 100, pkmnRaw, 0, 100);
+                    PokemonEntry entry = new PokemonEntry(pkmnRaw, bestAddr + (j * 100));
+                    if (entry.species > 0 && entry.species <= 1000) team.add(entry);
+                }
+            }
+        }
+        
         return team;
     }
 
-    private boolean scanPartyAtOffset(List<PokemonEntry> team, int startAddr) {
-        byte[] data = NativeBridge.readMemory(startAddr, 100); // Check only first slot for speed
-        if (data == null) return false;
+    private int scorePartyData(byte[] range, int localOff, int absoluteAddr) {
+        int score = 0;
+        long commonOtId = -1;
         
-        PokemonEntry first = new PokemonEntry(data, startAddr);
-        if (first.species > 0 && first.species <= 1000) {
-            // Found a valid first slot, read the full party (6 slots)
-            byte[] fullData = NativeBridge.readMemory(startAddr, 600);
-            if (fullData == null) return false;
+        for (int j = 0; j < 3; j++) { // Check first 3 slots for consistency
+            int pOff = localOff + (j * 100);
+            byte[] pkmnRaw = new byte[100];
+            System.arraycopy(range, pOff, pkmnRaw, 0, 100);
+            PokemonEntry p = new PokemonEntry(pkmnRaw, absoluteAddr + (j * 100));
             
-            team.clear();
-            for (int i = 0; i < 6; i++) {
-                byte[] pkmnRaw = new byte[100];
-                System.arraycopy(fullData, i * 100, pkmnRaw, 0, 100);
-                PokemonEntry entry = new PokemonEntry(pkmnRaw, startAddr + (i * 100));
-                if (entry.species > 0 && entry.species <= 1000) team.add(entry);
+            if (p.species > 0 && p.species <= 1000) {
+                score += 10;
+                if (p.level > 0 && p.level <= 100) score += 5;
+                if (p.currentHp <= p.maxHp && p.maxHp > 0) score += 5;
+                
+                // Active party members usually share the same OTID
+                if (commonOtId == -1) commonOtId = p.otId;
+                else if (p.otId == commonOtId) score += 10;
+            } else if (p.species == 0 && j > 0) {
+                score += 2;
             }
-            return !team.isEmpty();
         }
-        return false;
+        return score;
     }
     
     public int getSaveBlock2Addr() { return saveBlock2Addr; }
