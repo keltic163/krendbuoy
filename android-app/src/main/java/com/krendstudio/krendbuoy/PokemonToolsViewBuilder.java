@@ -383,6 +383,51 @@ final class PokemonToolsViewBuilder {
         basicInfo.setTextColor(Color.LTGRAY);
         root.addView(basicInfo);
 
+        root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_personality)));
+        
+        // Nature Dropdown
+        LinearLayout natureRow = new LinearLayout(activity);
+        natureRow.setOrientation(LinearLayout.HORIZONTAL);
+        natureRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView natureLbl = new TextView(activity);
+        natureLbl.setText(activity.getString(R.string.pokemon_nature));
+        natureLbl.setTextColor(Color.WHITE);
+        natureRow.addView(natureLbl, new LinearLayout.LayoutParams(0, -2, 1f));
+        
+        final TextView natureVal = new TextView(activity);
+        natureVal.setText(PokemonConstants.getNatureName(p.getNature()));
+        natureVal.setTextColor(Color.CYAN);
+        natureVal.setPadding(16, 8, 16, 8);
+        natureVal.setBackground(makeRoundRect(0x33FFFFFF, 8));
+        natureVal.setOnClickListener(v -> {
+            String[] natures = new String[25];
+            for (int i = 0; i < 25; i++) natures[i] = PokemonConstants.getNatureName(i);
+            new AlertDialog.Builder(activity)
+                    .setTitle(activity.getString(R.string.pokemon_nature))
+                    .setItems(natures, (d, which) -> {
+                        p.setNature(which);
+                        natureVal.setText(PokemonConstants.getNatureName(p.getNature()));
+                    }).show();
+        });
+        natureRow.addView(natureVal);
+        root.addView(natureRow);
+
+        // Ability Slot
+        CheckBox abilityCb = new CheckBox(activity);
+        abilityCb.setText(activity.getString(R.string.pokemon_ability_slot) + " (0/1)");
+        abilityCb.setTextColor(Color.WHITE);
+        abilityCb.setChecked(p.abilitySlot == 1);
+        abilityCb.setOnCheckedChangeListener((v, checked) -> p.abilitySlot = checked ? 1 : 0);
+        root.addView(abilityCb);
+
+        // Shiny Toggle
+        CheckBox shinyCb = new CheckBox(activity);
+        shinyCb.setText(activity.getString(R.string.pokemon_shiny));
+        shinyCb.setTextColor(Color.YELLOW);
+        shinyCb.setChecked(p.isShiny());
+        shinyCb.setOnCheckedChangeListener((v, checked) -> p.setShiny(checked));
+        root.addView(shinyCb);
+
         root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_iv_ev)));
         addStatEditRow(activity, root, "HP", p.hpIv, p.hpEv, val -> p.hpIv = val, val -> p.hpEv = val);
         addStatEditRow(activity, root, "ATK", p.atkIv, p.atkEv, val -> p.atkIv = val, val -> p.atkEv = val);
@@ -390,12 +435,6 @@ final class PokemonToolsViewBuilder {
         addStatEditRow(activity, root, "SpA", p.spAtkIv, p.spAtkEv, val -> p.spAtkIv = val, val -> p.spAtkEv = val);
         addStatEditRow(activity, root, "SpD", p.spDefIv, p.spDefEv, val -> p.spDefIv = val, val -> p.spDefEv = val);
         addStatEditRow(activity, root, "SPD", p.speedIv, p.speedEv, val -> p.speedIv = val, val -> p.speedEv = val);
-
-        root.addView(sectionTitle(activity, activity.getString(R.string.pokemon_personality)));
-        root.addView(makeSystemButton(activity, activity.getString(R.string.pokemon_shiny), () -> {
-            makeShiny(p);
-            Toast.makeText(activity, "Magic applied (Shiny mode)", Toast.LENGTH_SHORT).show();
-        }));
 
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.pokemon_edit_title_format, pm.getSpeciesName(p.species)))
@@ -409,18 +448,6 @@ final class PokemonToolsViewBuilder {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
-    }
-
-    private static void makeShiny(PokemonEntry p) {
-        long tid = p.otId & 0xFFFF;
-        long sid = (p.otId >> 16) & 0xFFFF;
-        long target = tid ^ sid;
-        
-        // Find a PV that makes (tid ^ sid ^ pvLow ^ pvHigh) < 8
-        // We'll keep pvHigh and change pvLow to match the target
-        long pvHigh = (p.pv >> 16) & 0xFFFF;
-        long pvLow = target ^ pvHigh ^ 0x0000; // Condition met when XORing result is 0
-        p.pv = (pvHigh << 16) | pvLow;
     }
 
     private static void addStatEditRow(Activity activity, LinearLayout root, String label, int iv, int ev, 

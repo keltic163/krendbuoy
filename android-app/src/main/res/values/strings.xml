@@ -199,6 +199,8 @@
     <string name="pokemon_iv_ev">IVs / EVs</string>
     <string name="pokemon_moves">Moves</string>
     <string name="pokemon_personality">Personality</string>
-    <string name="pokemon_shiny">Shiny</string>
+    <string name="pokemon_nature">Nature</string>
+    <string name="pokemon_ability_slot">Ability Slot</string>
+    <string name="pokemon_shiny">Shiny Mode</string>
     <string name="pokemon_edit_title_format">Edit %1$s</string>
 </resources>

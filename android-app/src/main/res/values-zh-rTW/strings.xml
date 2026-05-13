@@ -198,7 +198,9 @@
     <string name="pokemon_stats">數值</string>
     <string name="pokemon_iv_ev">個體值 / 努力值</string>
     <string name="pokemon_moves">招式</string>
-    <string name="pokemon_personality">性格與屬性</string>
-    <string name="pokemon_shiny">閃光</string>
+    <string name="pokemon_personality">性格與特性</string>
+    <string name="pokemon_nature">性格</string>
+    <string name="pokemon_ability_slot">特性槽</string>
+    <string name="pokemon_shiny">閃光模式</string>
     <string name="pokemon_edit_title_format">編輯 %1$s</string>
 </resources>

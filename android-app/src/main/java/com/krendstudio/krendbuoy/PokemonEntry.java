@@ -22,6 +22,7 @@ public class PokemonEntry {
     public int hp, atk, def, spAtk, spDef, speed;
     public int hpEv, atkEv, defEv, spAtkEv, spDefEv, speedEv;
     public int hpIv, atkIv, defIv, spAtkIv, spDefIv, speedIv;
+    public int isEgg, abilitySlot;
     private long originalIvDword;
     
     // Moves
@@ -104,6 +105,8 @@ public class PokemonEntry {
         speedIv = (int)((originalIvDword >> 15) & 0x1F);
         spAtkIv = (int)((originalIvDword >> 20) & 0x1F);
         spDefIv = (int)((originalIvDword >> 25) & 0x1F);
+        isEgg = (int)((originalIvDword >> 30) & 0x01);
+        abilitySlot = (int)((originalIvDword >> 31) & 0x01);
     }
 
     private byte[] decrypt(byte[] data, long pv, long otId) {
@@ -130,6 +133,47 @@ public class PokemonEntry {
         if (c == 'A') return 1;
         if (c == 'F') return 2;
         return 3; // E
+    }
+
+    public int getNature() { return (int)(pv % 25); }
+    
+    public void setNature(int natureId) {
+        setNatureAndShiny(natureId, isShiny());
+    }
+
+    public void setShiny(boolean shiny) {
+        setNatureAndShiny(getNature(), shiny);
+    }
+
+    private void setNatureAndShiny(int natureId, boolean shiny) {
+        if (natureId < 0 || natureId >= 25) return;
+        int tid = (int)(otId & 0xFFFF);
+        int sid = (int)((otId >> 16) & 0xFFFF);
+        int targetXor = tid ^ sid;
+
+        // Brute force 32-bit PV
+        // We start searching from a random-ish point or the current PV to keep it consistent
+        long startPv = pv & 0xFFFFFFFFL;
+        for (long i = 0; i < 0xFFFFFF; i++) {
+            long testPv = (startPv + i) & 0xFFFFFFFFL;
+            if ((testPv % 25) == natureId) {
+                int pvL = (int)(testPv & 0xFFFF);
+                int pvH = (int)((testPv >> 16) & 0xFFFF);
+                boolean currentIsShiny = (targetXor ^ pvL ^ pvH) < 8;
+                if (currentIsShiny == shiny) {
+                    pv = testPv;
+                    return;
+                }
+            }
+        }
+    }
+
+    public boolean isShiny() {
+        int tid = (int)(otId & 0xFFFF);
+        int sid = (int)((otId >> 16) & 0xFFFF);
+        int pvL = (int)(pv & 0xFFFF);
+        int pvH = (int)((pv >> 16) & 0xFFFF);
+        return (tid ^ sid ^ pvL ^ pvH) < 8;
     }
 
     public byte[] toRaw() {
@@ -164,9 +208,9 @@ public class PokemonEntry {
 
         // Block 3: Misc / IVs
         ByteBuffer bE = ByteBuffer.wrap(blocks[3]).order(ByteOrder.LITTLE_ENDIAN);
-        long newIvDword = (originalIvDword & 0xC0000000L) // Preserve upper bits (isEgg, ability)
-                        | (hpIv & 0x1F) | ((atkIv & 0x1F) << 5) | ((defIv & 0x1F) << 10) 
-                        | ((speedIv & 0x1F) << 15) | ((spAtkIv & 0x1F) << 20) | ((spDefIv & 0x1F) << 25);
+        long newIvDword = (hpIv & 0x1F) | ((atkIv & 0x1F) << 5) | ((defIv & 0x1F) << 10) 
+                        | ((speedIv & 0x1F) << 15) | ((spAtkIv & 0x1F) << 20) | ((spDefIv & 0x1F) << 25)
+                        | ((long)isEgg << 30) | ((long)abilitySlot << 31);
         bE.putInt(4, (int)newIvDword);
 
         // Calculate Checksum of decrypted blocks

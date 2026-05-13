@@ -26,6 +26,19 @@ public class PokemonConstants {
         return "未知道具";
     }
 
+    public static String getNatureName(int id) {
+        if (id >= 0 && id < NATURE_NAMES.length) return NATURE_NAMES[id];
+        return "未知性格";
+    }
+
+    private static final String[] NATURE_NAMES = {
+        "硬直 (Hardy)", "孤僻 (Lonely)", "勇敢 (Brave)", "固執 (Adamant)", "調皮 (Naughty)",
+        "大膽 (Bold)", "坦率 (Docile)", "悠閒 (Relaxed)", "淘氣 (Impish)", "馬虎 (Lax)",
+        "膽小 (Timid)", "急躁 (Hasty)", "認真 (Serious)", "爽朗 (Jolly)", "天真 (Naive)",
+        "保守 (Modest)", "穩重 (Mild)", "冷靜 (Quiet)", "害羞 (Bashful)", " rash (Rash)",
+        "沉著 (Calm)", "溫和 (Gentle)", "自大 (Sassy)", "慎重 (Careful)", "浮躁 (Quirky)"
+    };
+
     public static List<ItemInfo> getCommonItems(Pocket p) {
         List<ItemInfo> list = new ArrayList<>();
         if (p == Pocket.BALLS) {
