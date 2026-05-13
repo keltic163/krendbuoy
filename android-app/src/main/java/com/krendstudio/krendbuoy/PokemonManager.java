@@ -326,49 +326,45 @@ public class PokemonManager {
         List<PokemonEntry> team = new ArrayList<>();
         if (saveBlock2Addr == 0) return team;
         GameVersion v = getEffectiveVersion();
+        boolean rse = usesRseLayout(v);
         
-        // FireRed/LeafGreen: 0x0034
-        // Ruby/Sapphire/Emerald: 0x0234
-        int offset = usesRseLayout(v) ? 0x0234 : 0x0034;
+        // 1. Try standard offsets first
+        int[] offsets = rse ? new int[]{0x0234} : new int[]{0x0034, 0x0038, 0x0040};
+        for (int off : offsets) {
+            if (scanPartyAtOffset(team, saveBlock2Addr + off)) return team;
+        }
         
-        // In some Hack ROMs, the offset might be shifted. 
-        // Let's perform a small scan if the first slot is empty but party count > 0
-        byte[] countByte = NativeBridge.readMemory(saveBlock2Addr + (usesRseLayout(v) ? 0x0230 : 0x0030), 1);
-        int partyCount = (countByte != null) ? (countByte[0] & 0xFF) : 0;
-        
-        if (partyCount > 6) partyCount = 0; // Invalid
-
-        byte[] data = NativeBridge.readMemory(saveBlock2Addr + offset, 600);
-        if (data == null) return team;
-        
-        for (int i = 0; i < 6; i++) {
-            byte[] pkmnRaw = new byte[100];
-            System.arraycopy(data, i * 100, pkmnRaw, 0, 100);
-            
-            // Validate species (Gen 3 has 412 species max)
-            // We need to peek at the decrypted species, but for now we check if slot has data
-            int pkmnAddr = saveBlock2Addr + offset + (i * 100);
-            PokemonEntry entry = new PokemonEntry(pkmnRaw, pkmnAddr);
-            if (entry.species > 0 && entry.species <= 1000) { // Support hack species
-                team.add(entry);
+        // 2. Perform a thorough scan near SB2 (compensates for shifted hack structures)
+        byte[] nearData = NativeBridge.readMemory(saveBlock2Addr, 1000);
+        if (nearData != null) {
+            for (int i = 0x20; i < nearData.length - 100; i += 4) {
+                if (scanPartyAtOffset(team, saveBlock2Addr + i)) return team;
             }
         }
         
-        // If still empty but partyCount > 0, try FRLG offset even if detected as RSE or vice versa
-        if (team.isEmpty() && partyCount > 0) {
-            int altOffset = (offset == 0x0234) ? 0x0034 : 0x0234;
-            byte[] altData = NativeBridge.readMemory(saveBlock2Addr + altOffset, 600);
-            if (altData != null) {
-                for (int i = 0; i < 6; i++) {
-                    byte[] pkmnRaw = new byte[100];
-                    System.arraycopy(altData, i * 100, pkmnRaw, 0, 100);
-                    PokemonEntry entry = new PokemonEntry(pkmnRaw, saveBlock2Addr + altOffset + (i * 100));
-                    if (entry.species > 0 && entry.species <= 1000) team.add(entry);
-                }
-            }
-        }
-
         return team;
+    }
+
+    private boolean scanPartyAtOffset(List<PokemonEntry> team, int startAddr) {
+        byte[] data = NativeBridge.readMemory(startAddr, 100); // Check only first slot for speed
+        if (data == null) return false;
+        
+        PokemonEntry first = new PokemonEntry(data, startAddr);
+        if (first.species > 0 && first.species <= 1000) {
+            // Found a valid first slot, read the full party (6 slots)
+            byte[] fullData = NativeBridge.readMemory(startAddr, 600);
+            if (fullData == null) return false;
+            
+            team.clear();
+            for (int i = 0; i < 6; i++) {
+                byte[] pkmnRaw = new byte[100];
+                System.arraycopy(fullData, i * 100, pkmnRaw, 0, 100);
+                PokemonEntry entry = new PokemonEntry(pkmnRaw, startAddr + (i * 100));
+                if (entry.species > 0 && entry.species <= 1000) team.add(entry);
+            }
+            return !team.isEmpty();
+        }
+        return false;
     }
     
     public int getSaveBlock2Addr() { return saveBlock2Addr; }
