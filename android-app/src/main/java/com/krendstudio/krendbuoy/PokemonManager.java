@@ -60,19 +60,31 @@ public class PokemonManager {
         byte[] b2 = NativeBridge.readMemory(p2, 4);
 
         if (b1 != null && b1.length == 4) {
-            saveBlock1Addr = ByteBuffer.wrap(b1).order(ByteOrder.LITTLE_ENDIAN).getInt();
-            if (saveBlock1Addr >= 0x02000000 && saveBlock1Addr <= 0x02048000) {
+            int newSB1 = ByteBuffer.wrap(b1).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            if (newSB1 >= 0x02000000 && newSB1 <= 0x02048000) {
+                saveBlock1Addr = newSB1;
                 moneyAddress = saveBlock1Addr + (rse ? 0x490 : 0x290);
             }
         }
         if (b2 != null && b2.length == 4) {
-            saveBlock2Addr = ByteBuffer.wrap(b2).order(ByteOrder.LITTLE_ENDIAN).getInt();
-            if (saveBlock2Addr >= 0x02000000) {
+            int newSB2 = ByteBuffer.wrap(b2).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            if (newSB2 >= 0x02000000 && newSB2 <= 0x02048000) {
+                saveBlock2Addr = newSB2;
                 scanForKeyHeuristically();
             }
         }
+        
+        // RE-VALIDATION: Check if this SB2 actually contains valid party data
+        if (saveBlock2Addr != 0) {
+            List<PokemonEntry> test = new ArrayList<>();
+            if (!scanPartyAtOffset(test, saveBlock2Addr + (rse ? 0x0234 : 0x0034))) {
+                // If standard offset fails, we must perform a scan because pointers might be stale
+                saveBlock2Addr = 0; 
+            }
+        }
+
         calibratePockets(v);
-        return saveBlock1Addr >= 0x02000000;
+        return saveBlock2Addr >= 0x02000000;
     }
 
     private void scanForKeyHeuristically() {
